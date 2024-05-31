@@ -64,11 +64,11 @@ type ServerCfg struct {
 var defaultConf = ServerCfg{
 	ConfigFile:      "livego.yaml",
 	FLVArchive:      false,
-	RTMPNoAuth:      false,
+	RTMPNoAuth:      true,
 	RTMPAddr:        ":1935",
 	HTTPFLVAddr:     ":7001",
 	HLSAddr:         ":7002",
-	HLSKeepAfterEnd: false,
+	HLSKeepAfterEnd: true,
 	APIAddr:         ":8090",
 	WriteTimeout:    10,
 	ReadTimeout:     10,
@@ -90,7 +90,7 @@ var (
 	// BypassInit can be used to bypass the init() function by setting this
 	// value to True at compile time.
 	//
-	// go build -ldflags "-X 'github.com/gwuhaolin/livego/configure.BypassInit=true'" -o livego main.go
+	// go build -ldflags "-X 'github.com/Team8te/svs-go/configure.BypassInit=true'" -o livego main.go
 	BypassInit string = ""
 )
 
@@ -127,7 +127,7 @@ func initDefault() {
 	pflag.String("api_addr", ":8090", "HTTP manage interface server listen address")
 	pflag.String("config_file", "livego.yaml", "configure filename")
 	pflag.String("level", "info", "Log level")
-	pflag.Bool("hls_keep_after_end", false, "Maintains the HLS after the stream ends")
+	pflag.Bool("hls_keep_after_end", true, "Maintains the HLS after the stream ends")
 	pflag.String("flv_dir", "tmp", "output flv file at flvDir/APP/KEY_TIME.flv")
 	pflag.Int("read_timeout", 10, "read time out")
 	pflag.Int("write_timeout", 10, "write time out")

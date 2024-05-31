@@ -8,11 +8,11 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/gwuhaolin/livego/configure"
-	"github.com/gwuhaolin/livego/protocol/api"
-	"github.com/gwuhaolin/livego/protocol/hls"
-	"github.com/gwuhaolin/livego/protocol/httpflv"
-	"github.com/gwuhaolin/livego/protocol/rtmp"
+	"github.com/Team8te/svs-go/configure"
+	"github.com/Team8te/svs-go/endpoint"
+	"github.com/Team8te/svs-go/protocol/hls"
+	"github.com/Team8te/svs-go/protocol/httpflv"
+	"github.com/Team8te/svs-go/protocol/rtmp"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -118,7 +118,7 @@ func startAPI(stream *rtmp.RtmpStream) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		opServer := api.NewServer(stream, rtmpAddr)
+		opServer := endpoint.NewServer(stream, rtmpAddr)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -139,6 +139,7 @@ func init() {
 			return fmt.Sprintf("%s()", f.Function), fmt.Sprintf(" %s:%d", filename, f.Line)
 		},
 	})
+	log.SetLevel(log.DebugLevel)
 }
 
 func main() {

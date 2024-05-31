@@ -1,4 +1,4 @@
-module github.com/gwuhaolin/livego
+module github.com/Team8te/svs-go
 
 go 1.13
 

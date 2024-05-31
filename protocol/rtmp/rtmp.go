@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwuhaolin/livego/utils/uid"
+	"github.com/Team8te/svs-go/utils/uid"
 
-	"github.com/gwuhaolin/livego/av"
-	"github.com/gwuhaolin/livego/configure"
-	"github.com/gwuhaolin/livego/container/flv"
-	"github.com/gwuhaolin/livego/protocol/rtmp/core"
+	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/configure"
+	"github.com/Team8te/svs-go/container/flv"
+	"github.com/Team8te/svs-go/protocol/rtmp/core"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -93,74 +93,67 @@ func (s *Server) Serve(listener net.Listener) (err error) {
 		conn := core.NewConn(netconn, 4*1024)
 		log.Debug("new client, connect remote: ", conn.RemoteAddr().String(),
 			"local:", conn.LocalAddr().String())
-		go s.handleConn(conn)
+		go func() {
+			err := s.handleConn(conn)
+			if err != nil {
+				log.Error("handleConn err: ", err)
+				conn.Close()
+			}
+		}()
 	}
 }
 
 func (s *Server) handleConn(conn *core.Conn) error {
 	if err := conn.HandshakeServer(); err != nil {
-		conn.Close()
-		log.Error("handleConn HandshakeServer err: ", err)
-		return err
+		return fmt.Errorf("handleConn HandshakeServer err: %w", err)
 	}
-	connServer := core.NewConnServer(conn)
 
+	connServer := core.NewConnServer(conn)
 	if err := connServer.ReadMsg(); err != nil {
-		conn.Close()
-		log.Error("handleConn read msg err: ", err)
-		return err
+		return fmt.Errorf("handleConn read msg err: %w", err)
 	}
 
 	appname, name, _ := connServer.GetInfo()
-
 	if ret := configure.CheckAppName(appname); !ret {
-		err := fmt.Errorf("application name=%s is not configured", appname)
-		conn.Close()
-		log.Error("CheckAppName err: ", err)
-		return err
+		return fmt.Errorf("CheckAppName err: application name=%s is not configured", appname)
 	}
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
-	if connServer.IsPublisher() {
-		if configure.Config.GetBool("rtmp_noauth") {
-			key, err := configure.RoomKeys.GetKey(name)
-			if err != nil {
-				err := fmt.Errorf("Cannot create key err=%s", err.Error())
-				conn.Close()
-				log.Error("GetKey err: ", err)
-				return err
-			}
-			name = key
-		}
-		channel, err := configure.RoomKeys.GetChannel(name)
-		if err != nil {
-			err := fmt.Errorf("invalid key err=%s", err.Error())
-			conn.Close()
-			log.Error("CheckKey err: ", err)
-			return err
-		}
-		connServer.PublishInfo.Name = channel
-		if pushlist, ret := configure.GetStaticPushUrlList(appname); ret && (pushlist != nil) {
-			log.Debugf("GetStaticPushUrlList: %v", pushlist)
-		}
-		reader := NewVirReader(connServer)
-		s.handler.HandleReader(reader)
-		log.Debugf("new publisher: %+v", reader.Info())
-
-		if s.getter != nil {
-			writeType := reflect.TypeOf(s.getter)
-			log.Debugf("handleConn:writeType=%v", writeType)
-			writer := s.getter.GetWriter(reader.Info())
-			s.handler.HandleWriter(writer)
-		}
-		if configure.Config.GetBool("flv_archive") {
-			flvWriter := new(flv.FlvDvr)
-			s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
-		}
-	} else {
+	if !connServer.IsPublisher() {
 		writer := NewVirWriter(connServer)
 		log.Debugf("new player: %+v", writer.Info())
 		s.handler.HandleWriter(writer)
+		return nil
+	}
+
+	if configure.Config.GetBool("rtmp_noauth") {
+		key, err := configure.RoomKeys.GetKey(name)
+		if err != nil {
+			return fmt.Errorf("Cannot create key err=%s", err.Error())
+		}
+		name = key
+	}
+	channel, err := configure.RoomKeys.GetChannel(name)
+	if err != nil {
+		return fmt.Errorf("CheckKey invalid key err=%s", err.Error())
+	}
+	connServer.PublishInfo.Name = channel
+	if pushlist, ret := configure.GetStaticPushUrlList(appname); ret && (pushlist != nil) {
+		log.Debugf("GetStaticPushUrlList: %v", pushlist)
+	}
+	reader := NewVirReader(connServer)
+	s.handler.HandleReader(reader)
+	log.Debugf("new publisher: %+v", reader.Info())
+
+	if s.getter != nil {
+		writeType := reflect.TypeOf(s.getter)
+		log.Debugf("handleConn:writeType=%v", writeType)
+		writer := s.getter.GetWriter(reader.Info())
+		s.handler.HandleWriter(writer)
+	}
+	if configure.Config.GetBool("flv_archive") {
+		flvWriter := new(flv.FlvDvr)
+		s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
 	}
 
 	return nil
@@ -283,7 +276,6 @@ func (v *VirWriter) DropPacket(pktQue chan *av.Packet, info av.Info) {
 	log.Debug("packet queue len: ", len(pktQue))
 }
 
-//
 func (v *VirWriter) Write(p *av.Packet) (err error) {
 	err = nil
 

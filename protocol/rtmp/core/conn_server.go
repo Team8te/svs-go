@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gwuhaolin/livego/av"
-	"github.com/gwuhaolin/livego/protocol/amf"
+	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/protocol/amf"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -243,7 +243,7 @@ func (connServer *ConnServer) playResp(cur *ChunkStream) error {
 
 func (connServer *ConnServer) handleCmdMsg(c *ChunkStream) error {
 	amfType := amf.AMF0
-	if c.TypeID == 17 {
+	if c.TypeID == av.CommandMessageAMF3 {
 		c.Data = c.Data[1:]
 	}
 	r := bytes.NewReader(c.Data)
@@ -310,7 +310,7 @@ func (connServer *ConnServer) ReadMsg() error {
 			return err
 		}
 		switch c.TypeID {
-		case 20, 17:
+		case av.CommandMessageAMF0, av.CommandMessageAMF3:
 			if err := connServer.handleCmdMsg(&c); err != nil {
 				return err
 			}

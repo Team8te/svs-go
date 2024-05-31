@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gwuhaolin/livego/av"
-	"github.com/gwuhaolin/livego/protocol/rtmp"
+	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/protocol/rtmp"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -46,7 +46,6 @@ func (server *Server) Serve(l net.Listener) error {
 	return nil
 }
 
-// 获取发布和播放器的信息
 func (server *Server) getStreams(w http.ResponseWriter, r *http.Request) *streams {
 	rtmpStream := server.handler.(*rtmp.RtmpStream)
 	if rtmpStream == nil {

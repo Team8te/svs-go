@@ -3,7 +3,7 @@ package ts
 import (
 	"io"
 
-	"github.com/gwuhaolin/livego/av"
+	"github.com/Team8te/svs-go/av"
 )
 
 const (
@@ -158,7 +158,7 @@ func (muxer *Muxer) Mux(p *av.Packet, w io.Writer) error {
 	return nil
 }
 
-//PAT return pat data
+// PAT return pat data
 func (muxer *Muxer) PAT() []byte {
 	i := 0
 	remainByte := 0
@@ -288,7 +288,7 @@ type pesHeader struct {
 	data [tsPacketLen]byte
 }
 
-//pesPacket return pes packet
+// pesPacket return pes packet
 func (header *pesHeader) packet(p *av.Packet, pts, dts int64) error {
 	//PES header
 	i := 0

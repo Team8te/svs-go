@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/gwuhaolin/livego/av"
+	"github.com/Team8te/svs-go/av"
 )
 
 type mpegExtension struct {

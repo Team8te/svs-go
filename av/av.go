@@ -13,6 +13,11 @@ const (
 )
 
 const (
+	CommandMessageAMF0 = 20
+	CommandMessageAMF3 = 17
+)
+
+const (
 	MetadatAMF0  = 0x12
 	MetadataAMF3 = 0xf
 )
