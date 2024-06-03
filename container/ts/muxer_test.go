@@ -3,7 +3,7 @@ package ts
 import (
 	"testing"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 
 	"github.com/stretchr/testify/assert"
 )

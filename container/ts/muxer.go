@@ -3,7 +3,7 @@ package ts
 import (
 	"io"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 )
 
 const (

@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
+	"github.com/Team8te/svs-go/pkg/utils/pio"
+	"github.com/Team8te/svs-go/pkg/utils/uid"
 	"github.com/Team8te/svs-go/protocol/amf"
-	"github.com/Team8te/svs-go/utils/pio"
-	"github.com/Team8te/svs-go/utils/uid"
 
 	log "github.com/sirupsen/logrus"
 )

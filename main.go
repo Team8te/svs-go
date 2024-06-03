@@ -13,6 +13,7 @@ import (
 	"github.com/Team8te/svs-go/protocol/hls"
 	"github.com/Team8te/svs-go/protocol/httpflv"
 	"github.com/Team8te/svs-go/protocol/rtmp"
+	"github.com/Team8te/svs-go/service"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -109,7 +110,7 @@ func startHTTPFlv(stream *rtmp.RtmpStream) {
 	}()
 }
 
-func startAPI(stream *rtmp.RtmpStream) {
+func startAPI(stream *rtmp.RtmpStream, s *service.Service) {
 	apiAddr := configure.Config.GetString("api_addr")
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 
@@ -118,7 +119,7 @@ func startAPI(stream *rtmp.RtmpStream) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		opServer := endpoint.NewServer(stream, rtmpAddr)
+		opServer := endpoint.NewEndpoint(stream, rtmpAddr, s)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -163,6 +164,7 @@ func main() {
 	configure.Config.UnmarshalKey("server", &apps)
 	for _, app := range apps {
 		stream := rtmp.NewRtmpStream()
+		s := service.NewService()
 		var hlsServer *hls.Server
 		if app.Hls {
 			hlsServer = startHls()

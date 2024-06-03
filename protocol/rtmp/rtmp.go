@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Team8te/svs-go/utils/uid"
+	"github.com/Team8te/svs-go/pkg/utils/uid"
 
-	"github.com/Team8te/svs-go/av"
 	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/container/flv"
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/rtmp/core"
 
 	log "github.com/sirupsen/logrus"

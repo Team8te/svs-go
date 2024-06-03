@@ -10,7 +10,7 @@ import (
 
 	"time"
 
-	"github.com/Team8te/svs-go/utils/pio"
+	"github.com/Team8te/svs-go/pkg/utils/pio"
 )
 
 var (

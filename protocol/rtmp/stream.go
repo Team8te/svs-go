@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/rtmp/cache"
 	"github.com/Team8te/svs-go/protocol/rtmp/rtmprelay"
 

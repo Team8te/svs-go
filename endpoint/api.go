@@ -1,13 +1,15 @@
 package endpoint
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 
-	"github.com/Team8te/svs-go/av"
 	"github.com/Team8te/svs-go/configure"
+	"github.com/Team8te/svs-go/ds"
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/rtmp"
 	"github.com/Team8te/svs-go/protocol/rtmp/rtmprelay"
 
@@ -48,14 +50,19 @@ type ClientInfo struct {
 	rtmpLocalClient  *rtmp.Client
 }
 
-type Server struct {
+type roomService interface {
+	CreateNewRoom(ctx context.Context, name string) (*ds.Room, error)
+}
+
+type Endpoint struct {
 	handler  av.Handler
 	session  map[string]*rtmprelay.RtmpRelay
 	rtmpAddr string
+	rs       roomService
 }
 
-func NewServer(h av.Handler, rtmpAddr string) *Server {
-	return &Server{
+func NewEndpoint(h av.Handler, rtmpAddr string) *Endpoint {
+	return &Endpoint{
 		handler:  h,
 		session:  make(map[string]*rtmprelay.RtmpRelay),
 		rtmpAddr: rtmpAddr,
@@ -100,7 +107,7 @@ func JWTMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) Serve(l net.Listener) error {
+func (s *Endpoint) Serve(l net.Listener) error {
 	mux := http.NewServeMux()
 
 	mux.Handle("/statics/", http.StripPrefix("/statics/", http.FileServer(http.Dir("statics"))))
@@ -143,7 +150,7 @@ type streams struct {
 }
 
 // http://127.0.0.1:8090/stat/livestat
-func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
+func (server *Endpoint) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 	res := &Response{
 		w:      w,
 		Data:   nil,
@@ -243,7 +250,7 @@ func (server *Server) GetLiveStatics(w http.ResponseWriter, req *http.Request) {
 }
 
 // http://127.0.0.1:8090/control/pull?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456
-func (s *Server) handlePull(w http.ResponseWriter, req *http.Request) {
+func (s *Endpoint) handlePull(w http.ResponseWriter, req *http.Request) {
 	var retString string
 	var err error
 
@@ -312,7 +319,7 @@ func (s *Server) handlePull(w http.ResponseWriter, req *http.Request) {
 }
 
 // http://127.0.0.1:8090/control/push?&oper=start&app=live&name=123456&url=rtmp://192.168.16.136/live/123456
-func (s *Server) handlePush(w http.ResponseWriter, req *http.Request) {
+func (s *Endpoint) handlePush(w http.ResponseWriter, req *http.Request) {
 	var retString string
 	var err error
 
@@ -375,7 +382,7 @@ func (s *Server) handlePush(w http.ResponseWriter, req *http.Request) {
 }
 
 // http://127.0.0.1:8090/control/reset?room=ROOM_NAME
-func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
+func (s *Endpoint) handleReset(w http.ResponseWriter, r *http.Request) {
 	res := &Response{
 		w:      w,
 		Data:   nil,
@@ -407,7 +414,7 @@ func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
 }
 
 // http://127.0.0.1:8090/control/get?room=ROOM_NAME
-func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
+func (e *Endpoint) handleGet(w http.ResponseWriter, r *http.Request) {
 	res := &Response{
 		w:      w,
 		Data:   nil,
@@ -421,24 +428,24 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room := r.Form.Get("room")
-
-	if len(room) == 0 {
+	name := r.Form.Get("room")
+	if len(name) == 0 {
 		res.Status = 400
 		res.Data = "url: /control/get?room=<ROOM_NAME>"
 		return
 	}
 
-	msg, err := configure.RoomKeys.GetKey(room)
+	room, err := e.rs.CreateNewRoom(r.Response.Request.Context(), name)
 	if err != nil {
-		msg = err.Error()
+		res.Data = err.Error()
 		res.Status = 400
 	}
-	res.Data = msg
+	res.Data = room.ID.ToString()
+	log.Debugf("[KEY] name: %s, id: %v", room.Name, room.ID)
 }
 
 // http://127.0.0.1:8090/control/delete?room=ROOM_NAME
-func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+func (s *Endpoint) handleDelete(w http.ResponseWriter, r *http.Request) {
 	res := &Response{
 		w:      w,
 		Data:   nil,

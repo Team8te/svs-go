@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Team8te/svs-go/av"
-	"github.com/Team8te/svs-go/parser/aac"
-	"github.com/Team8te/svs-go/parser/h264"
-	"github.com/Team8te/svs-go/parser/mp3"
+	"github.com/Team8te/svs-go/pkg/av"
+	"github.com/Team8te/svs-go/pkg/parser/aac"
+	"github.com/Team8te/svs-go/pkg/parser/h264"
+	"github.com/Team8te/svs-go/pkg/parser/mp3"
 )
 
 var (

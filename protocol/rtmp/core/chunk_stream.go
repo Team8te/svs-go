@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/Team8te/svs-go/av"
-	"github.com/Team8te/svs-go/utils/pool"
+	"github.com/Team8te/svs-go/pkg/av"
+	"github.com/Team8te/svs-go/pkg/utils/pool"
 )
 
 type ChunkStream struct {

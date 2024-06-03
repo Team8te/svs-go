@@ -12,7 +12,7 @@ import (
 
 	"github.com/Team8te/svs-go/configure"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 
 	log "github.com/sirupsen/logrus"
 )

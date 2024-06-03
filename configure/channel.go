@@ -3,7 +3,7 @@ package configure
 import (
 	"fmt"
 
-	"github.com/Team8te/svs-go/utils/uid"
+	"github.com/Team8te/svs-go/pkg/utils/uid"
 
 	"github.com/go-redis/redis/v7"
 	"github.com/patrickmn/go-cache"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/amf"
 
 	log "github.com/sirupsen/logrus"

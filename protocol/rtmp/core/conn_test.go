@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/Team8te/svs-go/utils/pool"
+	"github.com/Team8te/svs-go/pkg/utils/pool"
 
 	"github.com/stretchr/testify/assert"
 )

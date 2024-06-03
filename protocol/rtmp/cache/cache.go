@@ -1,8 +1,8 @@
 package cache
 
 import (
-	"github.com/Team8te/svs-go/av"
 	"github.com/Team8te/svs-go/configure"
+	"github.com/Team8te/svs-go/pkg/av"
 )
 
 type Cache struct {

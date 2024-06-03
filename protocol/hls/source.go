@@ -3,13 +3,14 @@ package hls
 import (
 	"bytes"
 	"fmt"
-	"github.com/Team8te/svs-go/configure"
 	"time"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/configure"
+
 	"github.com/Team8te/svs-go/container/flv"
 	"github.com/Team8te/svs-go/container/ts"
-	"github.com/Team8te/svs-go/parser"
+	"github.com/Team8te/svs-go/pkg/av"
+	"github.com/Team8te/svs-go/pkg/parser"
 
 	log "github.com/sirupsen/logrus"
 )

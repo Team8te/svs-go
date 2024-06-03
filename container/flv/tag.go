@@ -3,7 +3,7 @@ package flv
 import (
 	"fmt"
 
-	"github.com/Team8te/svs-go/av"
+	"github.com/Team8te/svs-go/pkg/av"
 )
 
 type flvTag struct {
