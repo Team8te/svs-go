@@ -15,7 +15,7 @@ type RoomKeysType struct {
 	localCache *cache.Cache
 }
 
-var RoomKeys = &RoomKeysType{
+var roomKeys = &RoomKeysType{
 	localCache: cache.New(cache.NoExpiration, 0),
 }
 
@@ -27,13 +27,13 @@ func Init() {
 		return
 	}
 
-	RoomKeys.redisCli = redis.NewClient(&redis.Options{
+	roomKeys.redisCli = redis.NewClient(&redis.Options{
 		Addr:     Config.GetString("redis_addr"),
 		Password: Config.GetString("redis_pwd"),
 		DB:       0,
 	})
 
-	_, err := RoomKeys.redisCli.Ping().Result()
+	_, err := roomKeys.redisCli.Ping().Result()
 	if err != nil {
 		log.Panic("Redis: ", err)
 	}

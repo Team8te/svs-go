@@ -13,7 +13,7 @@ import (
 	"github.com/Team8te/svs-go/protocol/hls"
 	"github.com/Team8te/svs-go/protocol/httpflv"
 	"github.com/Team8te/svs-go/protocol/rtmp"
-	"github.com/Team8te/svs-go/service"
+	"github.com/Team8te/svs-go/repo"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -40,7 +40,7 @@ func startHls() *hls.Server {
 	return hlsServer
 }
 
-func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server) {
+func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server, r *repo.Repo) {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -67,13 +67,13 @@ func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server) {
 		}
 	}
 
-	var rtmpServer *rtmp.Server
+	var rtmpServer *rtmp.RtmpServer
 
 	if hlsServer == nil {
-		rtmpServer = rtmp.NewRtmpServer(stream, nil)
+		rtmpServer = rtmp.NewRtmpServer(stream, nil, r)
 		log.Info("HLS server disable....")
 	} else {
-		rtmpServer = rtmp.NewRtmpServer(stream, hlsServer)
+		rtmpServer = rtmp.NewRtmpServer(stream, hlsServer, r)
 		log.Info("HLS server enable....")
 	}
 
@@ -110,7 +110,7 @@ func startHTTPFlv(stream *rtmp.RtmpStream) {
 	}()
 }
 
-func startAPI(stream *rtmp.RtmpStream, s *service.Service) {
+func startAPI(stream *rtmp.RtmpStream, r *repo.Repo) {
 	apiAddr := configure.Config.GetString("api_addr")
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 
@@ -119,7 +119,7 @@ func startAPI(stream *rtmp.RtmpStream, s *service.Service) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		opServer := endpoint.NewEndpoint(stream, rtmpAddr, s)
+		opServer := endpoint.NewEndpoint(stream, rtmpAddr, r)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -161,10 +161,10 @@ func main() {
 	`, VERSION)
 
 	apps := configure.Applications{}
+	r := repo.NewRepo()
 	configure.Config.UnmarshalKey("server", &apps)
 	for _, app := range apps {
 		stream := rtmp.NewRtmpStream()
-		s := service.NewService()
 		var hlsServer *hls.Server
 		if app.Hls {
 			hlsServer = startHls()
@@ -173,9 +173,9 @@ func main() {
 			startHTTPFlv(stream)
 		}
 		if app.Api {
-			startAPI(stream)
+			startAPI(stream, r)
 		}
 
-		startRtmp(stream, hlsServer)
+		startRtmp(stream, hlsServer, r)
 	}
 }

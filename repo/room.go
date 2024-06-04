@@ -28,6 +28,15 @@ func (r *Repo) GetRoomByName(_ context.Context, name string) (*ds.Room, error) {
 	return nil, ds.ErrorNotFound
 }
 
+// GetRoomByID ...
+func (r *Repo) GetRoomByID(_ context.Context, id string) (*ds.Room, error) {
+	if key, found := r.localCache.Get(id); found {
+		res := *key.(*ds.Room) // make copy
+		return &res, nil
+	}
+	return nil, ds.ErrorNotFound
+}
+
 // DeleteRoomByName ...
 func (r *Repo) DeleteRoomByName(ctx context.Context, name string) error {
 	room, err := r.GetRoomByName(ctx, name)

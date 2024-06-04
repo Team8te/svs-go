@@ -1,6 +1,7 @@
 package rtmp
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/utils/uid"
 
 	"github.com/Team8te/svs-go/configure"
@@ -21,6 +23,10 @@ import (
 const (
 	maxQueueNum           = 1024
 	SAVE_STATICS_INTERVAL = 5000
+)
+
+const (
+	MaxBufferSize = 4 * 1024
 )
 
 var (
@@ -65,19 +71,26 @@ func (c *Client) GetHandle() av.Handler {
 	return c.handler
 }
 
-type Server struct {
-	handler av.Handler
-	getter  av.GetWriter
+type roomSerice interface {
+	GetRoomByName(_ context.Context, name string) (*ds.Room, error)
+	GetRoomByID(_ context.Context, id string) (*ds.Room, error)
 }
 
-func NewRtmpServer(h av.Handler, getter av.GetWriter) *Server {
-	return &Server{
+type RtmpServer struct {
+	handler av.Handler
+	getter  av.GetWriter
+	rs      roomSerice
+}
+
+func NewRtmpServer(h av.Handler, getter av.GetWriter, rs roomSerice) *RtmpServer {
+	return &RtmpServer{
 		handler: h,
 		getter:  getter,
+		rs:      rs,
 	}
 }
 
-func (s *Server) Serve(listener net.Listener) (err error) {
+func (s *RtmpServer) Serve(listener net.Listener) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("rtmp serve panic: ", r)
@@ -103,7 +116,8 @@ func (s *Server) Serve(listener net.Listener) (err error) {
 	}
 }
 
-func (s *Server) handleConn(conn *core.Conn) error {
+func (s *RtmpServer) handleConn(conn *core.Conn) error {
+	ctx := context.Background()
 	if err := conn.HandshakeServer(); err != nil {
 		return fmt.Errorf("handleConn HandshakeServer err: %w", err)
 	}
@@ -127,17 +141,17 @@ func (s *Server) handleConn(conn *core.Conn) error {
 	}
 
 	if configure.Config.GetBool("rtmp_noauth") {
-		key, err := configure.RoomKeys.GetKey(name)
+		room, err := s.rs.GetRoomByID(ctx, name)
 		if err != nil {
 			return fmt.Errorf("Cannot create key err=%s", err.Error())
 		}
-		name = key
+		name = room.Name
 	}
-	channel, err := configure.RoomKeys.GetChannel(name)
+	room, err := s.rs.GetRoomByName(ctx, name)
 	if err != nil {
 		return fmt.Errorf("CheckKey invalid key err=%s", err.Error())
 	}
-	connServer.PublishInfo.Name = channel
+	connServer.PublishInfo.Name = room.Name
 	if pushlist, ret := configure.GetStaticPushUrlList(appname); ret && (pushlist != nil) {
 		log.Debugf("GetStaticPushUrlList: %v", pushlist)
 	}
