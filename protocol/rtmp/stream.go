@@ -111,6 +111,14 @@ func NewStream() *Stream {
 	}
 }
 
+func NewStreamWithReader(r av.ReadCloser) *Stream {
+	return &Stream{
+		cache: cache.NewCache(),
+		ws:    &sync.Map{},
+		r:     r,
+	}
+}
+
 func (s *Stream) ID() string {
 	if s.r != nil {
 		return s.r.Info().UID

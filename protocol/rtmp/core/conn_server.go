@@ -353,6 +353,10 @@ func (connServer *ConnServer) GetInfo() (app string, name string, url string) {
 	return
 }
 
+func (connServer *ConnServer) GetName() string {
+	return connServer.PublishInfo.Name
+}
+
 func (connServer *ConnServer) Close(err error) {
 	connServer.conn.Close()
 }
