@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/utils/uid"
+	"github.com/Team8te/svs-go/service"
 
 	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/pkg/av"
@@ -74,6 +74,7 @@ func (c *Client) GetHandle() av.Handler {
 type roomSerice interface {
 	GetRoomByName(ctx context.Context, name string) (*ds.Room, error)
 	GetRoomByID(ctx context.Context, id string) (*ds.Room, error)
+	UpdateRoomByName(_ context.Context, room *ds.Room) error
 }
 
 type RtmpServer struct {
@@ -87,8 +88,8 @@ func NewRtmpServer(h av.Handler, getter av.GetWriter, rs roomSerice) *RtmpServer
 		handler: h,
 		getter:  getter,
 		Service: Service{
-			r:       rs,
-			streams: sync.Map{},
+			r:  rs,
+			st: service.NewStreamer(),
 		},
 	}
 }
@@ -130,11 +131,13 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
 	if !connServer.IsPublisher() {
-		writer := NewVirWriter(connServer)
-		log.Debugf("new player: %+v", writer.Info())
-		s.handler.HandleWriter(writer)
+		/*
+			writer := NewVirWriter(connServer)
+			log.Debugf("new player: %+v", writer.Info())
+			s.handler.HandleWriter(writer)
+		*/
 
-		//return s.CreateSubscriber(ctx, connServer)
+		return s.CreateSubscriber(ctx, connServer)
 		return nil
 	}
 
@@ -156,7 +159,7 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 		log.Debugf("GetStaticPushUrlList: %v", pushlist)
 	}
 
-	s.CreateRtmpPublisher(ctx, connServer)
+	_, err = s.CreateRtmpPublisher(ctx, connServer)
 	/*
 		reader := newPublisher(connServer)
 		s.handler.HandleReader(reader)
@@ -174,7 +177,7 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 		}
 	*/
 
-	return nil
+	return err
 }
 
 func (s *RtmpServer) makeServerConnection(_ context.Context, conn *core.Conn) (*core.ConnServer, error) {

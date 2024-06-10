@@ -28,6 +28,17 @@ func (r *Repo) GetRoomByName(_ context.Context, name string) (*ds.Room, error) {
 	return nil, ds.ErrorNotFound
 }
 
+// UpdateRoomByName ...
+func (r *Repo) UpdateRoomByName(_ context.Context, room *ds.Room) error {
+	if _, found := r.localCache.Get(room.Name); !found {
+		return ds.ErrorNotFound
+
+	}
+	r.localCache.SetDefault(room.ID.ToString(), room)
+	r.localCache.SetDefault(room.Name, room)
+	return nil
+}
+
 // GetRoomByID ...
 func (r *Repo) GetRoomByID(_ context.Context, id string) (*ds.Room, error) {
 	if key, found := r.localCache.Get(id); found {

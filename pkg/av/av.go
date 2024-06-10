@@ -158,3 +158,14 @@ type WriteCloser interface {
 	CalcTime
 	Write(*Packet) error
 }
+
+type Publisher interface {
+	Read(*Packet) error
+}
+
+type Subscriber interface {
+	Closer
+	Alive
+	CalcTime
+	Write(*Packet) error
+}

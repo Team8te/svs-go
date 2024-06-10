@@ -2,23 +2,30 @@ package rtmp
 
 import (
 	"context"
-	"sync"
 
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/rtmp/core"
 	log "github.com/sirupsen/logrus"
 )
 
+type streamer interface {
+	CreateStream(pub av.Publisher) (int64, error)
+	StartStream(id int64) error
+	RemoveStream(id int64) error
+	AddSubscribers(id int64, subs ...av.Subscriber) error
+}
+
 // Service ...
 type Service struct {
-	r       roomSerice
-	streams sync.Map
+	r  roomSerice
+	st streamer
 }
 
 // NewService ...
-func NewService(r roomSerice) *Service {
+func NewService(r roomSerice, st streamer) *Service {
 	return &Service{
-		r:       r,
-		streams: sync.Map{},
+		r:  r,
+		st: st,
 	}
 }
 
@@ -32,23 +39,13 @@ func (s *Service) CreateRtmpPublisher(ctx context.Context, conn *core.ConnServer
 	p := newPublisher(conn)
 	log.Debugf("new publisher: %+v", p.Info())
 
-	stream := NewStreamWithReader(p)
-	stream.info = p.Info()
-
-	go s.runStream(r.ID.ToString(), stream)
-
-	return 0, nil
-}
-
-func (s *Service) runStream(id string, st *Stream) {
-	s.streams.Store(id, st)
-	defer s.removeStream(id)
-	st.TransStart()
-}
-
-func (s *Service) removeStream(id string) error {
-	s.streams.Delete(id)
-	return nil
+	r.StreamID, err = s.st.CreateStream(p)
+	if err != nil {
+		return 0, err
+	}
+	s.r.UpdateRoomByName(ctx, r)
+	go s.st.StartStream(r.StreamID)
+	return r.StreamID, nil
 }
 
 func (s *Service) CreateSubscriber(ctx context.Context, conn *core.ConnServer) error {
@@ -56,17 +53,8 @@ func (s *Service) CreateSubscriber(ctx context.Context, conn *core.ConnServer) e
 	if err != nil {
 		return err
 	}
-	sub := NewSub(conn)
-	log.Infof("new sub: %+v . Room id: %v, name: %v", sub.Info(), r.ID, r.Name)
+	sub := NewVirWriter(conn)
+	log.Infof("new sub: %+v . Room id: %v, name: %v, stream_id: %v", sub.Info(), r.ID, r.Name, r.StreamID)
 
-	go s.runSub(sub, r.Name)
-
-	return nil
-}
-
-func (s *Service) runSub(sub *VirWriter, roomName string) {
-	s.streams.Store(roomName, sub)
-	defer s.removeStream(roomName)
-	go sub.Check()
-	sub.SendPacket()
+	return s.st.AddSubscribers(r.StreamID, sub)
 }
