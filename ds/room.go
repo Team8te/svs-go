@@ -12,7 +12,6 @@ func (r *RoomID) ToString() string {
 
 // Room ...
 type Room struct {
-	ID       RoomID
-	Name     string
-	StreamID int64
+	ID   RoomID
+	Name string
 }

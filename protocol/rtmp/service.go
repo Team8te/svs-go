@@ -3,16 +3,17 @@ package rtmp
 import (
 	"context"
 
+	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/Team8te/svs-go/protocol/rtmp/core"
 	log "github.com/sirupsen/logrus"
 )
 
 type streamer interface {
-	CreateStream(pub av.Publisher) (int64, error)
-	StartStream(id int64) error
-	RemoveStream(id int64) error
-	AddSubscribers(id int64, subs ...av.Subscriber) error
+	CreateStreamAndBind(pub av.Publisher, id ds.RoomID) error
+	StartStream(id ds.RoomID) error
+	RemoveStream(id ds.RoomID) error
+	AddSubscribers(id ds.RoomID, subs ...av.Subscriber) error
 }
 
 // Service ...
@@ -30,22 +31,22 @@ func NewService(r roomSerice, st streamer) *Service {
 }
 
 // CreateRtmpDestination ...
-func (s *Service) CreateRtmpPublisher(ctx context.Context, conn *core.ConnServer) (int64, error) {
+func (s *Service) CreateRtmpPublisher(ctx context.Context, conn *core.ConnServer) error {
 	r, err := s.r.GetRoomByID(ctx, conn.GetName())
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	p := newPublisher(conn)
 	log.Debugf("new publisher: %+v", p.Info())
 
-	r.StreamID, err = s.st.CreateStream(p)
+	err = s.st.CreateStreamAndBind(p, r.ID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	s.r.UpdateRoomByName(ctx, r)
-	go s.st.StartStream(r.StreamID)
-	return r.StreamID, nil
+	go s.st.StartStream(r.ID)
+	return nil
 }
 
 func (s *Service) CreateSubscriber(ctx context.Context, conn *core.ConnServer) error {
@@ -54,7 +55,7 @@ func (s *Service) CreateSubscriber(ctx context.Context, conn *core.ConnServer) e
 		return err
 	}
 	sub := NewVirWriter(conn)
-	log.Infof("new sub: %+v . Room id: %v, name: %v, stream_id: %v", sub.Info(), r.ID, r.Name, r.StreamID)
+	log.Infof("new sub: %+v . Room id: %v, name: %v", sub.Info(), r.ID, r.Name)
 
-	return s.st.AddSubscribers(r.StreamID, sub)
+	return s.st.AddSubscribers(r.ID, sub)
 }

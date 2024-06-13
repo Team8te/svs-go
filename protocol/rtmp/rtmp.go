@@ -159,7 +159,7 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 		log.Debugf("GetStaticPushUrlList: %v", pushlist)
 	}
 
-	_, err = s.CreateRtmpPublisher(ctx, connServer)
+	err = s.CreateRtmpPublisher(ctx, connServer)
 	/*
 		reader := newPublisher(connServer)
 		s.handler.HandleReader(reader)
