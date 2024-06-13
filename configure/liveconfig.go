@@ -108,7 +108,6 @@ func init() {
 }
 
 func initDefault() {
-	defer Init()
 
 	// Default config
 	b, _ := json.Marshal(defaultConf)

@@ -94,7 +94,7 @@ func NewRtmpServer(h av.Handler, getter av.GetWriter, rs roomSerice) *RtmpServer
 	}
 }
 
-func (s *RtmpServer) Serve(listener net.Listener) (err error) {
+func (s *RtmpServer) Serve(listener net.Listener) error {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("rtmp serve panic: ", r)
@@ -102,10 +102,9 @@ func (s *RtmpServer) Serve(listener net.Listener) (err error) {
 	}()
 
 	for {
-		var netconn net.Conn
-		netconn, err = listener.Accept()
+		netconn, err := listener.Accept()
 		if err != nil {
-			return
+			return err
 		}
 		conn := core.NewConn(netconn, maxBufferSize)
 		log.Debug("new client, connect remote: ", conn.RemoteAddr().String(),
@@ -131,14 +130,7 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
 	if !connServer.IsPublisher() {
-		/*
-			writer := NewVirWriter(connServer)
-			log.Debugf("new player: %+v", writer.Info())
-			s.handler.HandleWriter(writer)
-		*/
-
 		return s.CreateSubscriber(ctx, connServer)
-		return nil
 	}
 
 	if configure.Config.GetBool("rtmp_noauth") {
@@ -148,36 +140,11 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 		}
 		name = room.Name
 	}
-	/*
-		room, err := s.rs.GetRoomByName(ctx, name)
-		if err != nil {
-			return fmt.Errorf("CheckKey invalid key err=%s", err.Error())
-		}
-		connServer.PublishInfo.Name = room.Name
-	*/
 	if pushlist, ret := configure.GetStaticPushUrlList(connServer.ConnInfo.App); ret && (pushlist != nil) {
 		log.Debugf("GetStaticPushUrlList: %v", pushlist)
 	}
 
-	err = s.CreateRtmpPublisher(ctx, connServer)
-	/*
-		reader := newPublisher(connServer)
-		s.handler.HandleReader(reader)
-		log.Debugf("new publisher: %+v", reader.Info())
-
-		if s.getter != nil {
-			writeType := reflect.TypeOf(s.getter)
-			log.Debugf("handleConn:writeType=%v", writeType)
-			writer := s.getter.GetWriter(reader.Info())
-			s.handler.HandleWriter(writer)
-		}
-		if configure.Config.GetBool("flv_archive") {
-			flvWriter := new(flv.FlvDvr)
-			s.handler.HandleWriter(flvWriter.GetWriter(reader.Info()))
-		}
-	*/
-
-	return err
+	return s.CreateRtmpPublisher(ctx, connServer)
 }
 
 func (s *RtmpServer) makeServerConnection(_ context.Context, conn *core.Conn) (*core.ConnServer, error) {
