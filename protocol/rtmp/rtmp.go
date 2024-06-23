@@ -11,7 +11,6 @@ import (
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/utils/uid"
-	"github.com/Team8te/svs-go/service"
 
 	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/pkg/av"
@@ -79,17 +78,14 @@ type roomSerice interface {
 
 type RtmpServer struct {
 	Service
-	handler av.Handler
-	getter  av.GetWriter
+	getter av.GetWriter
 }
 
-func NewRtmpServer(h av.Handler, getter av.GetWriter, rs roomSerice) *RtmpServer {
+func NewRtmpServer(rs roomSerice) *RtmpServer {
 	return &RtmpServer{
-		handler: h,
-		getter:  getter,
 		Service: Service{
-			r:  rs,
-			st: service.NewStreamer(),
+			r: rs,
+			//st: service.NewStreamer(),
 		},
 	}
 }
@@ -130,7 +126,8 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 
 	log.Debugf("handleConn: IsPublisher=%v", connServer.IsPublisher())
 	if !connServer.IsPublisher() {
-		return s.CreateSubscriber(ctx, connServer)
+		//return s.CreateSubscriber(ctx, connServer)
+		return nil
 	}
 
 	if configure.Config.GetBool("rtmp_noauth") {
@@ -144,7 +141,8 @@ func (s *RtmpServer) handleConn(conn *core.Conn) error {
 		log.Debugf("GetStaticPushUrlList: %v", pushlist)
 	}
 
-	return s.CreateRtmpPublisher(ctx, connServer)
+	//return s.CreateRtmpPublisher(ctx, connServer)
+	return nil
 }
 
 func (s *RtmpServer) makeServerConnection(_ context.Context, conn *core.Conn) (*core.ConnServer, error) {

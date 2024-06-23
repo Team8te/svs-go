@@ -14,6 +14,7 @@ import (
 	"github.com/Team8te/svs-go/protocol/httpflv"
 	"github.com/Team8te/svs-go/protocol/rtmp"
 	"github.com/Team8te/svs-go/repo"
+	"github.com/Team8te/svs-go/service"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -67,27 +68,37 @@ func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server, r *repo.Repo) {
 		}
 	}
 
-	var rtmpServer *rtmp.RtmpServer
+	/*
+		var rtmpServer *rtmp.RtmpServer
 
-	if hlsServer == nil {
-		rtmpServer = rtmp.NewRtmpServer(stream, nil, r)
-		log.Info("HLS server disable....")
-	} else {
-		rtmpServer = rtmp.NewRtmpServer(stream, hlsServer, r)
-		log.Info("HLS server enable....")
-	}
+		if hlsServer == nil {
+			rtmpServer = rtmp.NewRtmpServer(r)
+			log.Info("HLS server disable....")
+		} else {
+			rtmpServer = rtmp.NewRtmpServer(r)
+			log.Info("HLS server enable....")
+		}
 
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("RTMP server panic: ", r)
+			}
+		}()
+		if isRtmps {
+			log.Info("RTMPS Listen On ", rtmpAddr)
+		} else {
+			log.Info("RTMP Listen On ", rtmpAddr)
+		}
+		rtmpServer.Serve(rtmpListen)
+	*/
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("RTMP server panic: ", r)
 		}
 	}()
-	if isRtmps {
-		log.Info("RTMPS Listen On ", rtmpAddr)
-	} else {
-		log.Info("RTMP Listen On ", rtmpAddr)
-	}
-	rtmpServer.Serve(rtmpListen)
+	st := service.NewStreamer()
+	rtmpServer := rtmp.NewServer(rtmpListen, r, st)
+	rtmpServer.Run()
 }
 
 func startHTTPFlv(stream *rtmp.RtmpStream) {

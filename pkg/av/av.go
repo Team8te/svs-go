@@ -3,6 +3,8 @@ package av
 import (
 	"fmt"
 	"io"
+
+	"github.com/Team8te/svs-go/ds"
 )
 
 const (
@@ -160,12 +162,10 @@ type WriteCloser interface {
 }
 
 type Publisher interface {
-	Read(*Packet) error
+	ReadFrame() (*ds.Frame, error)
+	Close()
 }
-
 type Subscriber interface {
-	Closer
-	Alive
-	CalcTime
-	Write(*Packet) error
+	Write(f *ds.Frame) error
+	Close()
 }

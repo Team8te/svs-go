@@ -20,14 +20,15 @@ func NewStreamer() *Streamer {
 	}
 }
 
-func (st *Streamer) CreateStreamAndBind(pub av.Publisher, id ds.RoomID) error {
+func (st *Streamer) CreateStreamAndBind(id ds.RoomID, pub av.Publisher) error {
 	s := st.FindStream(id)
 	if s == nil {
 		s = st.createEmptyStream()
 		st.EmplaceStream(id, s)
 	}
 
-	return s.setPub(pub)
+	s.pub = pub
+	return nil
 }
 
 func (st *Streamer) createEmptyStream() *stream {

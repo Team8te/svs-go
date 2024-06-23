@@ -6,6 +6,7 @@ import (
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/av"
+	"github.com/Team8te/svs-go/pkg/utils/uid"
 	"github.com/Team8te/svs-go/protocol/rtmp/cache"
 	log "github.com/sirupsen/logrus"
 )
@@ -19,72 +20,65 @@ type stream struct {
 	subs  sync.Map
 }
 
-type subscriber struct {
-	av.Subscriber
-	init bool
-}
-
 func (s *stream) setPub(pub av.Publisher) error {
 	s.mxp.Lock()
 	defer s.mxp.Unlock()
-	if s.	pub != nil {
+	if s.pub != nil {
 		return ds.ErrorAlreadyUsed
 	}
 	s.pub = pub
 	return nil
 }
 
-func (s *stream) do(p av.Packet) {
-	err := s.pub.Read(&p)
+func (s *stream) do() {
+	frame, err := s.pub.ReadFrame()
 	if err != nil {
 		log.Errorf("stream runtime error: %v", err)
 		return
 	}
-	s.cache.Write(p)
 
 	s.subs.Range(func(k, v interface{}) bool {
-		sub := v.(*subscriber)
-		if !sub.init {
-			if err := s.cache.Send(sub); err != nil {
-				log.Debugf("[%s] send cache packet error: %v, remove", sub.Info(), err)
-			}
-			sub.init = true
-		} else {
-			pp := p
-			err := sub.Write(&pp)
-			if err != nil {
-				log.Errorf("stream runtime error. Failed send to sub: %v", err)
-				s.subs.Delete(k)
-			}
+		sub := v.(av.Subscriber)
+		err := sub.Write(frame)
+		if err != nil {
+			sub.Close()
+			s.subs.Delete(k)
+			log.Errorf("send cache packet error: %v", frame)
 		}
-
 		return true
 	})
 }
 
 func (s *stream) run(ctx context.Context) {
-	var p av.Packet
 	ctx, cancel := context.WithCancel(ctx)
 	s.cancel = cancel
+	defer s.pub.Close()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			s.do(p)
+			s.do()
 		}
 	}
 }
 
 func (s *stream) addSubs(subs ...av.Subscriber) {
 	for _, sub := range subs {
-		s.subs.Store(sub.Info().UID, &subscriber{
-			Subscriber: sub,
-			init:       false,
-		})
+		s.subs.Store(uid.NewId(), sub)
 	}
 }
 
 func (s *stream) stop() {
 	s.cancel()
+}
+
+func (s *stream) removeAllSubs() {
+	s.subs.Range(func(k, v interface{}) bool {
+		sub := v.(av.Subscriber)
+		sub.Close()
+		s.subs.Delete(k)
+
+		return true
+	})
 }
