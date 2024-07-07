@@ -41,7 +41,7 @@ func startHls() *hls.Server {
 	return hlsServer
 }
 
-func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server, r *repo.Repo) {
+func startRtmp(hlsServer *hls.Server, r *repo.Repo) {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -67,30 +67,6 @@ func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server, r *repo.Repo) {
 			log.Fatal(err)
 		}
 	}
-
-	/*
-		var rtmpServer *rtmp.RtmpServer
-
-		if hlsServer == nil {
-			rtmpServer = rtmp.NewRtmpServer(r)
-			log.Info("HLS server disable....")
-		} else {
-			rtmpServer = rtmp.NewRtmpServer(r)
-			log.Info("HLS server enable....")
-		}
-
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error("RTMP server panic: ", r)
-			}
-		}()
-		if isRtmps {
-			log.Info("RTMPS Listen On ", rtmpAddr)
-		} else {
-			log.Info("RTMP Listen On ", rtmpAddr)
-		}
-		rtmpServer.Serve(rtmpListen)
-	*/
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("RTMP server panic: ", r)
@@ -101,7 +77,7 @@ func startRtmp(stream *rtmp.RtmpStream, hlsServer *hls.Server, r *repo.Repo) {
 	rtmpServer.Run()
 }
 
-func startHTTPFlv(stream *rtmp.RtmpStream) {
+func startHTTPFlv() {
 	httpflvAddr := configure.Config.GetString("httpflv_addr")
 
 	flvListen, err := net.Listen("tcp", httpflvAddr)
@@ -109,7 +85,7 @@ func startHTTPFlv(stream *rtmp.RtmpStream) {
 		log.Fatal(err)
 	}
 
-	hdlServer := httpflv.NewServer(stream)
+	hdlServer := httpflv.NewServer(nil)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -121,7 +97,7 @@ func startHTTPFlv(stream *rtmp.RtmpStream) {
 	}()
 }
 
-func startAPI(stream *rtmp.RtmpStream, r *repo.Repo) {
+func startAPI(r *repo.Repo) {
 	apiAddr := configure.Config.GetString("api_addr")
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 
@@ -130,7 +106,7 @@ func startAPI(stream *rtmp.RtmpStream, r *repo.Repo) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		opServer := endpoint.NewEndpoint(stream, rtmpAddr, r)
+		opServer := endpoint.NewEndpoint(rtmpAddr, r)
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -175,18 +151,17 @@ func main() {
 	r := repo.NewRepo()
 	configure.Config.UnmarshalKey("server", &apps)
 	for _, app := range apps {
-		stream := rtmp.NewRtmpStream()
 		var hlsServer *hls.Server
 		if app.Hls {
 			hlsServer = startHls()
 		}
 		if app.Flv {
-			startHTTPFlv(stream)
+			startHTTPFlv()
 		}
 		if app.Api {
-			startAPI(stream, r)
+			startAPI(r)
 		}
 
-		startRtmp(stream, hlsServer, r)
+		startRtmp(hlsServer, r)
 	}
 }

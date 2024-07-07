@@ -58,6 +58,7 @@ type ServerCfg struct {
 	GopNum          int          `mapstructure:"gop_num"`
 	JWT             JWT          `mapstructure:"jwt"`
 	Server          Applications `mapstructure:"server"`
+	NeedArchive     bool         `mapstructure:"need_archive"`
 }
 
 // default config
@@ -74,6 +75,7 @@ var defaultConf = ServerCfg{
 	ReadTimeout:     10,
 	EnableTLSVerify: true,
 	GopNum:          1,
+	NeedArchive:     true,
 	Server: Applications{{
 		Appname:    "live",
 		Live:       true,
@@ -132,6 +134,7 @@ func initDefault() {
 	pflag.Int("write_timeout", 10, "write time out")
 	pflag.Int("gop_num", 1, "gop num")
 	pflag.Bool("enable_tls_verify", true, "Use system root CA to verify RTMPS connection, set this flag to false on Windows")
+	pflag.Bool("need_archive", true, "Archive publish stream")
 	pflag.Parse()
 	Config.BindPFlags(pflag.CommandLine)
 
@@ -185,4 +188,8 @@ func GetStaticPushUrlList(appname string) ([]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+func NeedArchive() bool {
+	return Config.GetBool("need_archive")
 }

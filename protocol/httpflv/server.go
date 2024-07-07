@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Team8te/svs-go/pkg/av"
-	"github.com/Team8te/svs-go/protocol/rtmp"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -47,38 +46,41 @@ func (server *Server) Serve(l net.Listener) error {
 }
 
 func (server *Server) getStreams(w http.ResponseWriter, r *http.Request) *streams {
-	rtmpStream := server.handler.(*rtmp.RtmpStream)
-	if rtmpStream == nil {
-		return nil
-	}
-	msgs := new(streams)
-
-	rtmpStream.GetStreams().Range(func(key, val interface{}) bool {
-		if s, ok := val.(*rtmp.Stream); ok {
-			if s.GetReader() != nil {
-				msg := stream{key.(string), s.GetReader().Info().UID}
-				msgs.Publishers = append(msgs.Publishers, msg)
-			}
+	/*
+		rtmpStream := server.handler.(*rtmp.RtmpStream)
+		if rtmpStream == nil {
+			return nil
 		}
-		return true
-	})
+		msgs := new(streams)
 
-	rtmpStream.GetStreams().Range(func(key, val interface{}) bool {
-		ws := val.(*rtmp.Stream).GetWs()
-
-		ws.Range(func(k, v interface{}) bool {
-			if pw, ok := v.(*rtmp.PackWriterCloser); ok {
-				if pw.GetWriter() != nil {
-					msg := stream{key.(string), pw.GetWriter().Info().UID}
-					msgs.Players = append(msgs.Players, msg)
+		rtmpStream.GetStreams().Range(func(key, val interface{}) bool {
+			if s, ok := val.(*rtmp.Stream); ok {
+				if s.GetReader() != nil {
+					msg := stream{key.(string), s.GetReader().Info().UID}
+					msgs.Publishers = append(msgs.Publishers, msg)
 				}
 			}
 			return true
 		})
-		return true
-	})
 
-	return msgs
+		rtmpStream.GetStreams().Range(func(key, val interface{}) bool {
+			ws := val.(*rtmp.Stream).GetWs()
+
+			ws.Range(func(k, v interface{}) bool {
+				if pw, ok := v.(*rtmp.PackWriterCloser); ok {
+					if pw.GetWriter() != nil {
+						msg := stream{key.(string), pw.GetWriter().Info().UID}
+						msgs.Players = append(msgs.Players, msg)
+					}
+				}
+				return true
+			})
+			return true
+		})
+
+		return msgs
+	*/
+	return nil
 }
 
 func (server *Server) getStream(w http.ResponseWriter, r *http.Request) {

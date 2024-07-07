@@ -6,7 +6,6 @@ import (
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/av"
-	"github.com/Team8te/svs-go/protocol/rtmp/cache"
 )
 
 type Streamer struct {
@@ -23,19 +22,12 @@ func NewStreamer() *Streamer {
 func (st *Streamer) CreateStreamAndBind(id ds.RoomID, pub av.Publisher) error {
 	s := st.FindStream(id)
 	if s == nil {
-		s = st.createEmptyStream()
+		s = &stream{}
 		st.EmplaceStream(id, s)
 	}
 
 	s.pub = pub
 	return nil
-}
-
-func (st *Streamer) createEmptyStream() *stream {
-	s := &stream{
-		cache: cache.NewCache(),
-	}
-	return s
 }
 
 func (st *Streamer) EmplaceStream(id ds.RoomID, s *stream) {
@@ -45,13 +37,13 @@ func (st *Streamer) EmplaceStream(id ds.RoomID, s *stream) {
 }
 
 func (st *Streamer) AddSubscribers(id ds.RoomID, subs ...av.Subscriber) error {
-	stream := st.FindStream(id)
-	if stream == nil {
-		stream = st.createEmptyStream()
-		st.EmplaceStream(id, stream)
+	s := st.FindStream(id)
+	if s == nil {
+		s = &stream{}
+		st.EmplaceStream(id, s)
 	}
 
-	stream.addSubs(subs...)
+	s.addSubs(subs...)
 	return nil
 }
 
@@ -96,6 +88,7 @@ func (st *Streamer) RemoveStream(id ds.RoomID) error {
 		return ds.ErrorNotFound
 	}
 	s.stop()
+	s.removeAllSubs()
 	delete(st.streams, id)
 	return nil
 }

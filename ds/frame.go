@@ -1,6 +1,8 @@
 package ds
 
-import "github.com/yapingcat/gomedia/go-codec"
+import (
+	"github.com/yapingcat/gomedia/go-codec"
+)
 
 type Frame struct {
 	Codec codec.CodecID
@@ -8,3 +10,28 @@ type Frame struct {
 	PTS   uint32
 	DTS   uint32
 }
+
+func (f *Frame) IsVideo() bool {
+	switch f.Codec {
+	case codec.CODECID_VIDEO_H264,
+		codec.CODECID_VIDEO_H265,
+		codec.CODECID_VIDEO_VP8:
+		return true
+	default:
+		return false
+	}
+}
+
+func (f *Frame) IsAudio() bool {
+	switch f.Codec {
+	case codec.CODECID_AUDIO_AAC,
+		codec.CODECID_AUDIO_G711A,
+		codec.CODECID_AUDIO_G711U,
+		codec.CODECID_AUDIO_OPUS,
+		codec.CODECID_AUDIO_MP3:
+		return true
+	default:
+		return false
+	}
+}
+

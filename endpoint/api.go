@@ -8,8 +8,6 @@ import (
 
 	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
-	"github.com/Team8te/svs-go/pkg/av"
-	"github.com/Team8te/svs-go/protocol/rtmp/rtmprelay"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	"github.com/dgrijalva/jwt-go"
@@ -34,16 +32,12 @@ type roomService interface {
 }
 
 type Endpoint struct {
-	handler  av.Handler
-	session  map[string]*rtmprelay.RtmpRelay
 	rtmpAddr string
 	rs       roomService
 }
 
-func NewEndpoint(h av.Handler, rtmpAddr string, rs roomService) *Endpoint {
+func NewEndpoint(rtmpAddr string, rs roomService) *Endpoint {
 	return &Endpoint{
-		handler:  h,
-		session:  make(map[string]*rtmprelay.RtmpRelay),
 		rtmpAddr: rtmpAddr,
 		rs:       rs,
 	}
@@ -91,19 +85,8 @@ func (s *Endpoint) Serve(l net.Listener) error {
 	mux := http.NewServeMux()
 
 	mux.Handle("/statics/", http.StripPrefix("/statics/", http.FileServer(http.Dir("statics"))))
-
-	mux.HandleFunc("/control/push", func(w http.ResponseWriter, r *http.Request) {
-		s.handlePush(w, r)
-	})
-	mux.HandleFunc("/control/pull", func(w http.ResponseWriter, r *http.Request) {
-		s.handlePull(w, r)
-	})
 	mux.HandleFunc("/room/create", func(w http.ResponseWriter, r *http.Request) {
 		resp := s.createRoomHandler(w, r)
-		resp.SendJson()
-	})
-	mux.HandleFunc("/stat/livestat", func(w http.ResponseWriter, r *http.Request) {
-		resp := s.getLiveStaticsHandler(w, r)
 		resp.SendJson()
 	})
 	http.Serve(l, JWTMiddleware(mux))
