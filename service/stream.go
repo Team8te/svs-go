@@ -45,7 +45,7 @@ func (s *stream) do() {
 		if err != nil {
 			sub.Close()
 			s.subs.Delete(k)
-			log.Errorf("send cache packet error: %v", frame)
+			log.Errorf("send cache packet error: %v", err)
 		}
 		return true
 	})

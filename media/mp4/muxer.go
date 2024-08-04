@@ -24,7 +24,7 @@ type MP4Writer struct {
 	streams map[streamType]uint32
 }
 
-func NewMP4Writer(name string) (*MP4Writer, error) {
+func NewMP4Muxer(name string) (*MP4Writer, error) {
 	mp4file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err

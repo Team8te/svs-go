@@ -3,7 +3,9 @@ package rtmp
 import (
 	"context"
 
+	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
+	"github.com/Team8te/svs-go/media/mp4"
 	"github.com/yapingcat/gomedia/go-codec"
 )
 
@@ -20,12 +22,21 @@ func makePublisher(ctx context.Context, streamID string, r roomSerice, s streame
 		return nil, err
 	}
 
-	return &publisher{
+	pub := &publisher{
 		roomID:  room.ID,
 		pubChan: make(chan *ds.Frame, frameBufferCount),
 		r:       r,
 		s:       s,
-	}, nil
+	}
+
+	if configure.NeedArchive() {
+		err = pub.addArchive(ctx, streamID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return pub, nil
 }
 
 func (p *publisher) start() error {
@@ -53,4 +64,9 @@ func (p *publisher) ReadFrame() (*ds.Frame, error) {
 func (p *publisher) Close() {
 	close(p.pubChan)
 	p.s.RemoveStream(p.roomID)
+}
+
+func (p *publisher) addArchive(_ context.Context, stream string) error {
+	w, _ := mp4.NewMP4Muxer(stream + ".mp4")
+	return p.s.AddSubscribers(p.roomID, w)
 }

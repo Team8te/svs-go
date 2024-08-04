@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -41,7 +42,7 @@ func startHls() *hls.Server {
 	return hlsServer
 }
 
-func startRtmp(hlsServer *hls.Server, r *repo.Repo) {
+func startRtmp(_ *hls.Server, r *repo.Repo) {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -74,7 +75,7 @@ func startRtmp(hlsServer *hls.Server, r *repo.Repo) {
 	}()
 	st := service.NewStreamer()
 	rtmpServer := rtmp.NewServer(rtmpListen, r, st)
-	rtmpServer.Run()
+	rtmpServer.Run(context.TODO())
 }
 
 func startHTTPFlv() {

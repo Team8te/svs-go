@@ -24,16 +24,15 @@ func NewServer(listener net.Listener, r roomSerice, st streamer) *Server {
 	}
 }
 
-func (s *Server) Run() {
+func (s *Server) Run(ctx context.Context) {
 	for {
 		c, err := s.l.Accept()
 		if err != nil {
 			return
 		}
 		conn := s.newConn(c)
-		conn.init()
-		ctx := context.Background()
-		ctx, conn.cancel = context.WithCancel(ctx)
+		ctx, conn.cancel = context.WithCancel(context.TODO())
+		conn.init(ctx)
 		go conn.run(ctx)
 	}
 }

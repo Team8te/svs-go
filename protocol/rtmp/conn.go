@@ -4,9 +4,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
-	"github.com/Team8te/svs-go/media/mp4"
 	log "github.com/sirupsen/logrus"
 	"github.com/yapingcat/gomedia/go-rtmp"
 )
@@ -39,63 +37,60 @@ func (s *rtmpConn) write(f *ds.Frame) error {
 	return s.handle.WriteFrame(f.Codec, f.Data, f.PTS, f.DTS)
 }
 
-func (s *rtmpConn) init() {
+func (s *rtmpConn) init(ctx context.Context) {
 	s.handle.OnPlay(func(app, streamName string, start, duration float64, reset bool) rtmp.StatusCode {
-		ctx := context.Background()
 		r, err := s.r.GetRoomByName(ctx, streamName)
 		if err != nil {
 			return rtmp.NETSTREAM_PLAY_NOTFOUND
 		}
 		log.Infof("new sub. Stream id: %v . Room id: %v, name: %v", streamName, r.ID, r.Name)
-		ns := &subscriber{
-			conn:       s,
-			firstVideo: true,
-		}
+		ns := MakeSubscriber(s)
+		ns.run(ctx)
 
 		s.st.AddSubscribers(r.ID, ns)
+		s.w = ns
 		return rtmp.NETSTREAM_PLAY_START
 	})
 
 	s.handle.OnPublish(func(app, streamName string) rtmp.StatusCode {
-		ctx := context.Background()
-		return s.runPublusher(ctx, streamName)
+		pub, err := s.makeAndStartPublisher(ctx, streamName)
+		if err != nil {
+			log.Warnf("Failed to make new publisher for stream: %v. Error: %v", streamName, err)
+			return rtmp.NETSTREAM_CONNECT_REJECTED
+		}
+
+		s.handle.OnFrame(pub.write)
+		s.w = pub
+		return rtmp.NETSTREAM_PUBLISH_START
 	})
 
 	s.handle.SetOutput(func(b []byte) error {
 		_, err := s.conn.Write(b)
 		return err
 	})
-	s.handle.OnStateChange(func(newState rtmp.RtmpState) {
-		switch newState {
-		case rtmp.STATE_RTMP_PLAY_START:
-			return
-		case rtmp.STATE_RTMP_PUBLISH_START:
-			if !configure.NeedArchive() {
-				return
-			}
-			stream := s.handle.GetStreamName()
-			ctx := context.Background()
-			r, err := s.r.GetRoomByID(ctx, stream)
-			if err != nil {
-				return
-			}
-
-			w, _ := mp4.NewMP4Writer(stream + ".mp4")
-			s.st.AddSubscribers(r.ID, w)
-		}
-	})
 }
 
-func (s *rtmpConn) runPublusher(ctx context.Context, stream string) rtmp.StatusCode {
-	pub, err := makePublisher(ctx, stream, s.r, s.st)
-	s.handle.OnFrame(pub.write)
+func (s *rtmpConn) makeAndStartPublisher(ctx context.Context, stream string) (*publisher, error) {
+	var pub *publisher
+	var err error
+	defer func() {
+		if err != nil {
+			if pub != nil {
+				pub.Close()
+			}
+		}
+	}()
+	pub, err = makePublisher(ctx, stream, s.r, s.st)
+	if err != nil {
+		return nil, err
+	}
+
 	err = pub.start()
 	if err != nil {
-		pub.Close()
-		return rtmp.NETSTREAM_CONNECT_REJECTED
+		return nil, err
 	}
-	s.w = pub
-	return rtmp.NETSTREAM_PUBLISH_START
+
+	return pub, nil
 }
 
 func (s *rtmpConn) run(ctx context.Context) {
@@ -132,5 +127,8 @@ func (s *rtmpConn) do(buf []byte) error {
 
 func (s *rtmpConn) close() {
 	s.cancel()
-	s.w.Close()
+	if s.w != nil {
+		s.w.Close()
+		s.w = nil
+	}
 }
