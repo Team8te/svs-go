@@ -11,7 +11,7 @@ type streamer interface {
 	CreateStreamAndBind(id ds.RoomID, pub av.Publisher) error
 	StartStream(id ds.RoomID) error
 	RemoveStream(id ds.RoomID) error
-	AddSubscribers(id ds.RoomID, subs ...av.Subscriber) error
+	BindSubscribers(id ds.RoomID, subs ...av.Subscriber) error
 }
 
 type roomSerice interface {

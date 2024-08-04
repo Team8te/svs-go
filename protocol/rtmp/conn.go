@@ -4,7 +4,10 @@ import (
 	"context"
 	"net"
 
+	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
+	"github.com/Team8te/svs-go/media/mp4"
+	"github.com/Team8te/svs-go/pkg/utils/uid"
 	log "github.com/sirupsen/logrus"
 	"github.com/yapingcat/gomedia/go-rtmp"
 )
@@ -18,7 +21,8 @@ type rtmpConn struct {
 	conn   net.Conn
 	handle *rtmp.RtmpServerHandle
 
-	w worker
+	sub worker
+	pub worker
 
 	r  roomSerice
 	st streamer
@@ -33,7 +37,7 @@ func (s *Server) newConn(c net.Conn) *rtmpConn {
 	}
 }
 
-func (s *rtmpConn) write(f *ds.Frame) error {
+func (s *rtmpConn) Write(f *ds.Frame) error {
 	return s.handle.WriteFrame(f.Codec, f.Data, f.PTS, f.DTS)
 }
 
@@ -44,11 +48,14 @@ func (s *rtmpConn) init(ctx context.Context) {
 			return rtmp.NETSTREAM_PLAY_NOTFOUND
 		}
 		log.Infof("new sub. Stream id: %v . Room id: %v, name: %v", streamName, r.ID, r.Name)
-		ns := MakeSubscriber(s)
-		ns.run(ctx)
+		sub := MakeSubscriber(uid.NewId(), s)
+		sub.run(ctx)
 
-		s.st.AddSubscribers(r.ID, ns)
-		s.w = ns
+		err = s.st.BindSubscribers(r.ID, sub)
+		if err != nil {
+			return rtmp.NETSTREAM_PLAY_NOTFOUND
+		}
+		s.sub = sub
 		return rtmp.NETSTREAM_PLAY_START
 	})
 
@@ -60,7 +67,7 @@ func (s *rtmpConn) init(ctx context.Context) {
 		}
 
 		s.handle.OnFrame(pub.write)
-		s.w = pub
+		s.pub = pub
 		return rtmp.NETSTREAM_PUBLISH_START
 	})
 
@@ -85,6 +92,13 @@ func (s *rtmpConn) makeAndStartPublisher(ctx context.Context, stream string) (*p
 		return nil, err
 	}
 
+	if configure.NeedArchive() {
+		w, _ := mp4.NewMP4Muxer(stream + ".mp4")
+		sub := MakeSubscriber("archive", w)
+		pub.BindSubscribers(ctx, sub)
+		sub.run(ctx)
+	}
+
 	err = pub.start()
 	if err != nil {
 		return nil, err
@@ -103,7 +117,7 @@ func (s *rtmpConn) run(ctx context.Context) {
 		default:
 			err := s.do(buf)
 			if err != nil {
-				s.close()
+				s.Close()
 				return
 			}
 		}
@@ -125,10 +139,14 @@ func (s *rtmpConn) do(buf []byte) error {
 	return nil
 }
 
-func (s *rtmpConn) close() {
+func (s *rtmpConn) Close() {
 	s.cancel()
-	if s.w != nil {
-		s.w.Close()
-		s.w = nil
+	if s.pub != nil {
+		s.pub.Close()
+		s.pub = nil
+	}
+
+	if s.sub != nil {
+		s.sub = nil
 	}
 }

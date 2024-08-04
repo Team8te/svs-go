@@ -3,11 +3,12 @@ package rtmp
 import (
 	"context"
 
-	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
-	"github.com/Team8te/svs-go/media/mp4"
+	"github.com/Team8te/svs-go/pkg/av"
 	"github.com/yapingcat/gomedia/go-codec"
 )
+
+var id = int64(0)
 
 type publisher struct {
 	roomID  ds.RoomID
@@ -29,13 +30,6 @@ func makePublisher(ctx context.Context, streamID string, r roomSerice, s streame
 		s:       s,
 	}
 
-	if configure.NeedArchive() {
-		err = pub.addArchive(ctx, streamID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return pub, nil
 }
 
@@ -49,11 +43,13 @@ func (p *publisher) start() error {
 
 func (p *publisher) write(cid codec.CodecID, pts, dts uint32, frame []byte) {
 	f := &ds.Frame{
+		ID:    id,
 		Codec: cid,
 		Data:  frame,
 		PTS:   pts,
 		DTS:   dts,
 	}
+	id++
 	p.pubChan <- f
 }
 
@@ -66,7 +62,6 @@ func (p *publisher) Close() {
 	p.s.RemoveStream(p.roomID)
 }
 
-func (p *publisher) addArchive(_ context.Context, stream string) error {
-	w, _ := mp4.NewMP4Muxer(stream + ".mp4")
-	return p.s.AddSubscribers(p.roomID, w)
+func (p *publisher) BindSubscribers(_ context.Context, subs ...av.Subscriber) error {
+	return p.s.BindSubscribers(p.roomID, subs...)
 }

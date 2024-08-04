@@ -36,7 +36,7 @@ func (st *Streamer) EmplaceStream(id ds.RoomID, s *stream) {
 	st.streams[id] = s
 }
 
-func (st *Streamer) AddSubscribers(id ds.RoomID, subs ...av.Subscriber) error {
+func (st *Streamer) BindSubscribers(id ds.RoomID, subs ...av.Subscriber) error {
 	s := st.FindStream(id)
 	if s == nil {
 		s = &stream{}

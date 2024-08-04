@@ -5,6 +5,7 @@ import (
 )
 
 type Frame struct {
+	ID    int64
 	Codec codec.CodecID
 	Data  []byte
 	PTS   uint32
@@ -34,4 +35,3 @@ func (f *Frame) IsAudio() bool {
 		return false
 	}
 }
-
