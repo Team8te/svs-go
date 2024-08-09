@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/Team8te/svs-go/pkg/av"
@@ -30,11 +29,6 @@ func (s *stream) setPub(pub av.Publisher) error {
 }
 
 func (s *stream) do() {
-	t := time.Now()
-	defer func() {
-		v := time.Since(t).Microseconds()
-		log.Debugf("Stream processed time: %v", v)
-	}()
 	frame, err := s.pub.ReadFrame()
 	if err != nil {
 		log.Errorf("stream runtime error: %v", err)

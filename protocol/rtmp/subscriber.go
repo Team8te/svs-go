@@ -20,7 +20,8 @@ type subscriber struct {
 	wr         writer
 
 	mx     sync.RWMutex
-	buff   chan *ds.Frame
+	ch     chan struct{}
+	buff   []*ds.Frame
 	cancel context.CancelFunc
 }
 
@@ -28,7 +29,8 @@ func MakeSubscriber(id string, wr writer) *subscriber {
 	sub := &subscriber{
 		id:         id,
 		firstVideo: true,
-		buff:       make(chan *ds.Frame, frameBufferCount),
+		ch:         make(chan struct{}, 1),
+		buff:       make([]*ds.Frame, 0, 100),
 		wr:         wr,
 	}
 	return sub
@@ -36,7 +38,7 @@ func MakeSubscriber(id string, wr writer) *subscriber {
 
 func (sub *subscriber) run(ctx context.Context) {
 	ctx, sub.cancel = context.WithCancel(ctx)
-	//go sub.do(ctx)
+	go sub.do(ctx)
 }
 
 func (sub *subscriber) do(ctx context.Context) {
@@ -44,8 +46,12 @@ func (sub *subscriber) do(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case f := <-sub.buff:
-			sub.sendFrame(f)
+		case _ = <-sub.ch:
+			frames := sub.getBuff()
+			for _, f := range frames {
+				sub.sendFrame(f)
+			}
+			log.Debugf("Send %v frames", len(frames))
 		}
 	}
 }
@@ -68,8 +74,14 @@ func (sub *subscriber) sendFrame(f *ds.Frame) {
 }
 
 func (sub *subscriber) Write(f *ds.Frame) error {
-	sub.sendFrame(f)
-	//sub.buff <- f
+	sub.mx.Lock()
+	sub.buff = append(sub.buff, f)
+	sub.mx.Unlock()
+	select {
+	case sub.ch <- struct{}{}:
+	default:
+	}
+
 	return nil
 }
 
@@ -79,12 +91,20 @@ func (sub *subscriber) Close() {
 	sub.mx.Lock()
 	defer sub.mx.Unlock()
 
-	if sub.buff != nil {
-		close(sub.buff)
-		sub.buff = nil
+	if sub.ch != nil {
+		close(sub.ch)
+		sub.ch = nil
 	}
 	if sub.wr != nil {
 		sub.wr.Close()
 		sub.wr = nil
 	}
+}
+
+func (sub *subscriber) getBuff() []*ds.Frame {
+	sub.mx.Lock()
+	defer sub.mx.Unlock()
+	res := sub.buff
+	sub.buff = make([]*ds.Frame, 0, 100)
+	return res
 }

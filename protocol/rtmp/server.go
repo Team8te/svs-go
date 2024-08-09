@@ -7,20 +7,22 @@ import (
 
 const (
 	frameBufferCount = 100000
-	maxBufferSize    = 4 * 1024
+	maxBufferSize    = 4 * 1024 * 1024
 )
 
 type Server struct {
-	l  net.Listener
-	r  roomSerice
-	st streamer
+	l      net.Listener
+	r      roomSerice
+	st     streamer
+	center *MediaCenter
 }
 
 func NewServer(listener net.Listener, r roomSerice, st streamer) *Server {
 	return &Server{
-		l:  listener,
-		r:  r,
-		st: st,
+		l:      listener,
+		r:      r,
+		st:     st,
+		center: MakeMediaCenter(),
 	}
 }
 
@@ -30,9 +32,10 @@ func (s *Server) Run(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		conn := s.newConn(c)
-		ctx, conn.cancel = context.WithCancel(context.TODO())
-		conn.init(ctx)
+		conn := newMediaSession(c)
+		ctx, cancel := context.WithCancel(context.TODO())
+		conn.cancel = cancel
+		s.center.Handle(ctx, conn)
 		go conn.run(ctx)
 	}
 }

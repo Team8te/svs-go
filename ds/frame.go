@@ -35,3 +35,14 @@ func (f *Frame) IsAudio() bool {
 		return false
 	}
 }
+
+func (f *Frame) Clone() *Frame {
+	tmp := &Frame{
+		Codec: f.Codec,
+		PTS:   f.PTS,
+		DTS:   f.DTS,
+	}
+	tmp.Data = make([]byte, len(f.Data))
+	copy(tmp.Data, f.Data)
+	return tmp
+}

@@ -2,151 +2,153 @@ package rtmp
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"net"
+	"sync"
+	"sync/atomic"
 
-	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
-	"github.com/Team8te/svs-go/media/mp4"
-	"github.com/Team8te/svs-go/pkg/utils/uid"
-	log "github.com/sirupsen/logrus"
 	"github.com/yapingcat/gomedia/go-rtmp"
 )
 
-type worker interface {
-	Close()
+type MediaProducer struct {
+	name      string
+	session   *MediaSession
+	mtx       sync.Mutex
+	consumers []*MediaSession
+	quit      chan struct{}
+	die       sync.Once
 }
 
-type rtmpConn struct {
-	cancel context.CancelFunc
-	conn   net.Conn
-	handle *rtmp.RtmpServerHandle
-
-	sub worker
-	pub worker
-
-	r  roomSerice
-	st streamer
-}
-
-func (s *Server) newConn(c net.Conn) *rtmpConn {
-	return &rtmpConn{
-		conn:   c,
-		handle: rtmp.NewRtmpServerHandle(),
-		r:      s.r,
-		st:     s.st,
+func newMediaProducer(name string, sess *MediaSession) *MediaProducer {
+	return &MediaProducer{
+		name:      name,
+		session:   sess,
+		consumers: make([]*MediaSession, 0, 10),
+		quit:      make(chan struct{}),
 	}
 }
 
-func (s *rtmpConn) Write(f *ds.Frame) error {
-	return s.handle.WriteFrame(f.Codec, f.Data, f.PTS, f.DTS)
-}
-
-func (s *rtmpConn) init(ctx context.Context) {
-	s.handle.OnPlay(func(app, streamName string, start, duration float64, reset bool) rtmp.StatusCode {
-		r, err := s.r.GetRoomByName(ctx, streamName)
-		if err != nil {
-			return rtmp.NETSTREAM_PLAY_NOTFOUND
-		}
-		log.Infof("new sub. Stream id: %v . Room id: %v, name: %v", streamName, r.ID, r.Name)
-		sub := MakeSubscriber(uid.NewId(), s)
-		sub.run(ctx)
-
-		err = s.st.BindSubscribers(r.ID, sub)
-		if err != nil {
-			return rtmp.NETSTREAM_PLAY_NOTFOUND
-		}
-		s.sub = sub
-		return rtmp.NETSTREAM_PLAY_START
-	})
-
-	s.handle.OnPublish(func(app, streamName string) rtmp.StatusCode {
-		pub, err := s.makeAndStartPublisher(ctx, streamName)
-		if err != nil {
-			log.Warnf("Failed to make new publisher for stream: %v. Error: %v", streamName, err)
-			return rtmp.NETSTREAM_CONNECT_REJECTED
-		}
-
-		s.handle.OnFrame(pub.write)
-		s.pub = pub
-		return rtmp.NETSTREAM_PUBLISH_START
-	})
-
-	s.handle.SetOutput(func(b []byte) error {
-		_, err := s.conn.Write(b)
-		return err
+func (producer *MediaProducer) stop() {
+	producer.die.Do(func() {
+		close(producer.quit)
 	})
 }
 
-func (s *rtmpConn) makeAndStartPublisher(ctx context.Context, stream string) (*publisher, error) {
-	var pub *publisher
-	var err error
+func (producer *MediaProducer) dispatch(ctx context.Context) {
 	defer func() {
-		if err != nil {
-			if pub != nil {
-				pub.Close()
-			}
-		}
+		fmt.Println("quit dispatch")
+		producer.stop()
 	}()
-	pub, err = makePublisher(ctx, stream, s.r, s.st)
-	if err != nil {
-		return nil, err
-	}
-
-	if configure.NeedArchive() {
-		w, _ := mp4.NewMP4Muxer(stream + ".mp4")
-		sub := MakeSubscriber("archive", w)
-		pub.BindSubscribers(ctx, sub)
-		sub.run(ctx)
-	}
-
-	err = pub.start()
-	if err != nil {
-		return nil, err
-	}
-
-	return pub, nil
-}
-
-func (s *rtmpConn) run(ctx context.Context) {
-	defer s.conn.Close()
-	buf := make([]byte, maxBufferSize)
 	for {
 		select {
+		case frame := <-producer.session.C:
+			if frame == nil {
+				continue
+			}
+			producer.mtx.Lock()
+			tmp := make([]*MediaSession, len(producer.consumers))
+			copy(tmp, producer.consumers)
+			producer.mtx.Unlock()
+			for _, c := range tmp {
+				if c.ready() {
+					tmp := frame.Clone()
+					c.play(tmp)
+				}
+			}
 		case <-ctx.Done():
 			return
-		default:
-			err := s.do(buf)
-			if err != nil {
-				s.Close()
-				return
-			}
 		}
 	}
 }
 
-func (s *rtmpConn) do(buf []byte) error {
-	n, err := s.conn.Read(buf)
-	if err != nil {
-		log.Error("failed to read chunk", "error: ", err)
-		return err
-	}
-	err = s.handle.Input(buf[:n])
-	if err != nil {
-		log.Error("failed to process chunk", "error: ", err)
-		return err
-	}
-
-	return nil
+func (producer *MediaProducer) addConsumer(consumer *MediaSession) {
+	producer.mtx.Lock()
+	defer producer.mtx.Unlock()
+	producer.consumers = append(producer.consumers, consumer)
 }
 
-func (s *rtmpConn) Close() {
-	s.cancel()
-	if s.pub != nil {
-		s.pub.Close()
-		s.pub = nil
+func (producer *MediaProducer) removeConsumer(id string) {
+	producer.mtx.Lock()
+	defer producer.mtx.Unlock()
+	res := make([]*MediaSession, 0, len(producer.consumers)-1)
+	for _, consume := range producer.consumers {
+		if consume.id != id {
+			res = append(res, consume)
+		}
 	}
 
-	if s.sub != nil {
-		s.sub = nil
+	producer.consumers = res
+}
+
+type MediaSession struct {
+	handle    *rtmp.RtmpServerHandle
+	conn      net.Conn
+	lists     []*ds.Frame
+	mtx       sync.Mutex
+	id        string
+	isReady   atomic.Bool
+	frameCome chan struct{}
+	die       sync.Once
+	C         chan *ds.Frame
+	cancel    context.CancelFunc
+}
+
+func newMediaSession(conn net.Conn) *MediaSession {
+	id := fmt.Sprintf("%d", rand.Uint64())
+	s := &MediaSession{
+		id:        id,
+		conn:      conn,
+		handle:    rtmp.NewRtmpServerHandle(),
+		frameCome: make(chan struct{}, 1),
+		C:         make(chan *ds.Frame, 30),
+	}
+
+	fmt.Println("newMediaSession isReady = false")
+	s.isReady.Store(false)
+
+	return s
+}
+
+func (sess *MediaSession) run(_ context.Context) {
+	defer sess.stop()
+	for {
+		buf := make([]byte, 65536)
+		n, err := sess.conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		err = sess.handle.Input(buf[:n])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
+}
+
+func (sess *MediaSession) stop() {
+	sess.die.Do(func() {
+		fmt.Println("stop isReady = false")
+		sess.isReady.Store(false)
+		sess.cancel()
+		sess.conn.Close()
+		close(sess.frameCome)
+		close(sess.C)
+	})
+}
+
+func (sess *MediaSession) ready() bool {
+	return sess.isReady.Load()
+}
+
+func (sess *MediaSession) play(frame *ds.Frame) {
+	sess.mtx.Lock()
+	sess.lists = append(sess.lists, frame)
+	sess.mtx.Unlock()
+	select {
+	case sess.frameCome <- struct{}{}:
+	default:
 	}
 }
