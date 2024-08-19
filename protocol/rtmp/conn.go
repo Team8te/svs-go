@@ -6,7 +6,6 @@ import (
 	"math/rand/v2"
 	"net"
 	"sync"
-	"sync/atomic"
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/yapingcat/gomedia/go-rtmp"
@@ -16,7 +15,7 @@ type MediaProducer struct {
 	name      string
 	session   *MediaSession
 	mtx       sync.Mutex
-	consumers []*MediaSession
+	consumers []*Consumer
 	quit      chan struct{}
 	die       sync.Once
 }
@@ -25,7 +24,7 @@ func newMediaProducer(name string, sess *MediaSession) *MediaProducer {
 	return &MediaProducer{
 		name:      name,
 		session:   sess,
-		consumers: make([]*MediaSession, 0, 10),
+		consumers: make([]*Consumer, 0, 10),
 		quit:      make(chan struct{}),
 	}
 }
@@ -48,13 +47,13 @@ func (producer *MediaProducer) dispatch(ctx context.Context) {
 				continue
 			}
 			producer.mtx.Lock()
-			tmp := make([]*MediaSession, len(producer.consumers))
+			tmp := make([]*Consumer, len(producer.consumers))
 			copy(tmp, producer.consumers)
 			producer.mtx.Unlock()
 			for _, c := range tmp {
-				if c.ready() {
+				if c.IsAlive() {
 					tmp := frame.Clone()
-					c.play(tmp)
+					c.Play(tmp)
 				}
 			}
 		case <-ctx.Done():
@@ -63,7 +62,7 @@ func (producer *MediaProducer) dispatch(ctx context.Context) {
 	}
 }
 
-func (producer *MediaProducer) addConsumer(consumer *MediaSession) {
+func (producer *MediaProducer) addConsumer(consumer *Consumer) {
 	producer.mtx.Lock()
 	defer producer.mtx.Unlock()
 	producer.consumers = append(producer.consumers, consumer)
@@ -72,9 +71,9 @@ func (producer *MediaProducer) addConsumer(consumer *MediaSession) {
 func (producer *MediaProducer) removeConsumer(id string) {
 	producer.mtx.Lock()
 	defer producer.mtx.Unlock()
-	res := make([]*MediaSession, 0, len(producer.consumers)-1)
+	res := make([]*Consumer, 0, len(producer.consumers)-1)
 	for _, consume := range producer.consumers {
-		if consume.id != id {
+		if consume.ID != id {
 			res = append(res, consume)
 		}
 	}
@@ -88,7 +87,6 @@ type MediaSession struct {
 	lists     []*ds.Frame
 	mtx       sync.Mutex
 	id        string
-	isReady   atomic.Bool
 	frameCome chan struct{}
 	die       sync.Once
 	C         chan *ds.Frame
@@ -106,7 +104,6 @@ func newMediaSession(conn net.Conn) *MediaSession {
 	}
 
 	fmt.Println("newMediaSession isReady = false")
-	s.isReady.Store(false)
 
 	return s
 }
@@ -131,16 +128,11 @@ func (sess *MediaSession) run(_ context.Context) {
 func (sess *MediaSession) stop() {
 	sess.die.Do(func() {
 		fmt.Println("stop isReady = false")
-		sess.isReady.Store(false)
 		sess.cancel()
 		sess.conn.Close()
 		close(sess.frameCome)
 		close(sess.C)
 	})
-}
-
-func (sess *MediaSession) ready() bool {
-	return sess.isReady.Load()
 }
 
 func (sess *MediaSession) play(frame *ds.Frame) {
@@ -151,4 +143,8 @@ func (sess *MediaSession) play(frame *ds.Frame) {
 	case sess.frameCome <- struct{}{}:
 	default:
 	}
+}
+
+func (sess *MediaSession) GetStreamName() string {
+	return sess.handle.GetStreamName()
 }

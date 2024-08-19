@@ -22,27 +22,18 @@ import (
 
 var VERSION = "master"
 
-func startHls() *hls.Server {
+func makeHls() *hls.HSLServer {
 	hlsAddr := configure.Config.GetString("hls_addr")
 	hlsListen, err := net.Listen("tcp", hlsAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	hlsServer := hls.NewServer()
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error("HLS server panic: ", r)
-			}
-		}()
-		log.Info("HLS listen On ", hlsAddr)
-		hlsServer.Serve(hlsListen)
-	}()
+	hlsServer := hls.NewHLSServer(hlsListen)
 	return hlsServer
 }
 
-func startRtmp(_ *hls.Server, r *repo.Repo) {
+func makeRtmp(r *repo.Repo) *rtmp.Server {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -74,8 +65,8 @@ func startRtmp(_ *hls.Server, r *repo.Repo) {
 		}
 	}()
 	st := service.NewStreamer()
-	rtmpServer := rtmp.NewServer(rtmpListen, r, st)
-	rtmpServer.Run(context.TODO())
+	rtmpServer := rtmp.NewServer(rtmpListen, r, st, rtmp.MakeMediaCenter())
+	return rtmpServer
 }
 
 func startHTTPFlv() {
@@ -131,6 +122,10 @@ func init() {
 	log.SetLevel(log.DebugLevel)
 }
 
+type app interface {
+	Run(ctx context.Context)
+}
+
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -148,13 +143,14 @@ func main() {
         version: %s
 	`, VERSION)
 
-	apps := configure.Applications{}
+	capps := configure.Applications{}
 	r := repo.NewRepo()
-	configure.Config.UnmarshalKey("server", &apps)
-	for _, app := range apps {
-		var hlsServer *hls.Server
+	configure.Config.UnmarshalKey("server", &capps)
+	apps := make([]app, 0)
+	apps = append(apps, makeRtmp(r))
+	for _, app := range capps {
 		if app.Hls {
-			hlsServer = startHls()
+			apps = append(apps, makeHls())
 		}
 		if app.Flv {
 			startHTTPFlv()
@@ -162,7 +158,14 @@ func main() {
 		if app.Api {
 			startAPI(r)
 		}
-
-		startRtmp(hlsServer, r)
 	}
+
+	ctx := context.TODO()
+
+	for _, a := range apps {
+		app := a
+		go app.Run(ctx)
+	}
+
+	select {}
 }

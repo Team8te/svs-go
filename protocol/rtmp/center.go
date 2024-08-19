@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/Team8te/svs-go/ds"
 	"github.com/yapingcat/gomedia/go-codec"
@@ -63,17 +64,17 @@ func (c *MediaCenter) Handle(ctx context.Context, conn *MediaSession) error {
 	conn.handle.OnStateChange(func(newState rtmp.RtmpState) {
 		if newState == rtmp.STATE_RTMP_PLAY_START {
 			fmt.Println("play start")
-			name := conn.handle.GetStreamName()
+			name := conn.GetStreamName()
 			source := c.Find(name)
 			if source != nil {
-				source.addConsumer(conn)
 				fmt.Println("ready to play")
-				conn.isReady.Store(true)
 				cons := &Consumer{
 					Name: name,
 					ID:   conn.id,
 					conn: conn,
 				}
+				cons.isAlive.Store(true)
+				source.addConsumer(cons)
 				go c.HandleConsumer(ctx, cons)
 			}
 		} else if newState == rtmp.STATE_RTMP_PUBLISH_START {
@@ -87,7 +88,7 @@ func (c *MediaCenter) Handle(ctx context.Context, conn *MediaSession) error {
 				}
 				conn.C <- f
 			})
-			name := conn.handle.GetStreamName()
+			name := conn.GetStreamName()
 			p := newMediaProducer(name, conn)
 			go c.HandlerProducer(ctx, p)
 			c.Register(name, p)
@@ -104,6 +105,7 @@ func (c *MediaCenter) HandlerProducer(ctx context.Context, p *MediaProducer) {
 
 func (c *MediaCenter) HandleConsumer(ctx context.Context, cons *Consumer) {
 	defer func() {
+		cons.Close()
 		p := c.Find(cons.Name)
 		if p != nil {
 			p.removeConsumer(cons.ID)
@@ -113,9 +115,10 @@ func (c *MediaCenter) HandleConsumer(ctx context.Context, cons *Consumer) {
 }
 
 type Consumer struct {
-	ID   string
-	Name string
-	conn *MediaSession
+	ID      string
+	Name    string
+	conn    *MediaSession
+	isAlive atomic.Bool
 }
 
 func (c *Consumer) run(ctx context.Context) {
@@ -147,4 +150,16 @@ func (c *Consumer) run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (c *Consumer) Play(frame *ds.Frame) {
+	c.conn.play(frame)
+}
+
+func (c *Consumer) Close() {
+	c.isAlive.Store(false)
+}
+
+func (c *Consumer) IsAlive() bool {
+	return c.isAlive.Load()
 }

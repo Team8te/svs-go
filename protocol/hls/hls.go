@@ -26,6 +26,7 @@ var (
 	ErrInvalidReq          = fmt.Errorf("invalid req url path")
 	ErrNoSupportVideoCodec = fmt.Errorf("no support video codec")
 	ErrNoSupportAudioCodec = fmt.Errorf("no support audio codec")
+	BadRequest             = fmt.Errorf("Bad request")
 )
 
 var crossdomainxml = []byte(`<?xml version="1.0" ?>
