@@ -97,7 +97,6 @@ func (muxer *hlsmuxer) makeHlsSegment(table []mp4.SyncSample, endTimestamp uint6
 
 type HSLServer struct {
 	l net.Listener
-	center Media
 }
 
 func NewHLSServer(l net.Listener) *HSLServer {

@@ -11,11 +11,11 @@ import (
 
 	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/endpoint"
+	"github.com/Team8te/svs-go/protocol/center"
 	"github.com/Team8te/svs-go/protocol/hls"
 	"github.com/Team8te/svs-go/protocol/httpflv"
 	"github.com/Team8te/svs-go/protocol/rtmp"
 	"github.com/Team8te/svs-go/repo"
-	"github.com/Team8te/svs-go/service"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -33,7 +33,7 @@ func makeHls() *hls.HSLServer {
 	return hlsServer
 }
 
-func makeRtmp(r *repo.Repo) *rtmp.Server {
+func makeRtmp() *rtmp.Server {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -64,8 +64,7 @@ func makeRtmp(r *repo.Repo) *rtmp.Server {
 			log.Error("RTMP server panic: ", r)
 		}
 	}()
-	st := service.NewStreamer()
-	rtmpServer := rtmp.NewServer(rtmpListen, r, st, rtmp.MakeMediaCenter())
+	rtmpServer := rtmp.NewServer(rtmpListen, rtmp.MakeMediaCenter(center.MakeMediaCenter()))
 	return rtmpServer
 }
 
@@ -147,7 +146,7 @@ func main() {
 	r := repo.NewRepo()
 	configure.Config.UnmarshalKey("server", &capps)
 	apps := make([]app, 0)
-	apps = append(apps, makeRtmp(r))
+	apps = append(apps, makeRtmp())
 	for _, app := range capps {
 		if app.Hls {
 			apps = append(apps, makeHls())
