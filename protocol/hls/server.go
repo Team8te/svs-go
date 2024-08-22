@@ -2,6 +2,7 @@ package hls
 
 import (
 	"bytes"
+	"container/list"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Team8te/svs-go/ds"
+	"github.com/Team8te/svs-go/protocol/center"
 	log "github.com/sirupsen/logrus"
 	"github.com/yapingcat/gomedia/go-mp4"
 	"github.com/yapingcat/gomedia/go-mpeg2"
@@ -95,20 +98,38 @@ func (muxer *hlsmuxer) makeHlsSegment(table []mp4.SyncSample, endTimestamp uint6
 	}
 }
 
-type HSLServer struct {
-	l net.Listener
+type MediaCenter interface {
+	AddConsumer(ctx context.Context, producerName string, consumer center.Consumer) error
+	RemoveConsumer(ctx context.Context, producerName string, id string) error
+	Find(name string) center.MediaProducer
 }
 
-func NewHLSServer(l net.Listener) *HSLServer {
-	return &HSLServer{
+type HLSServer struct {
+	l         net.Listener
+	c         MediaCenter
+	m3u8Cache map[string]*list.List
+}
+
+func NewHLSServer(l net.Listener, c MediaCenter) *HLSServer {
+	return &HLSServer{
 		l: l,
+		c: c,
 	}
 }
 
-func (hls *HSLServer) onM3U8(w http.ResponseWriter, r *http.Request) {
+func (hls *HLSServer) makeM3U8PlayList(stream string) []byte {
+	return nil
+}
+
+func (hls *HLSServer) Play(name string, frame *ds.Frame) {
+	
+}
+
+func (hls *HLSServer) onM3U8(w http.ResponseWriter, r *http.Request) {
 	streamName := strings.TrimLeft(r.URL.Path, "/live/")
 	streamName = strings.TrimRight(streamName, ".m3u8")
 	fileName := streamName + ".mp4"
+	//hls.c.AddConsumer(context.TODO(), streamName)
 	f, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println(err)
@@ -149,7 +170,7 @@ func (hls *HSLServer) onM3U8(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
-func (hls *HSLServer) onTs(w http.ResponseWriter, r *http.Request) {
+func (hls *HLSServer) onTs(w http.ResponseWriter, r *http.Request) {
 	start, _ := strconv.ParseInt(r.URL.Query().Get("start"), 10, 64)
 	end, _ := strconv.ParseInt(r.URL.Query().Get("end"), 10, 64)
 	fmt.Println("start:", start, "end:", end)
@@ -206,7 +227,7 @@ func (hls *HSLServer) onTs(w http.ResponseWriter, r *http.Request) {
 	w.Write(buf.Bytes())
 }
 
-func (hls *HSLServer) handle(w http.ResponseWriter, r *http.Request) {
+func (hls *HLSServer) handle(w http.ResponseWriter, r *http.Request) {
 	if path.Base(r.URL.Path) == "crossdomain.xml" {
 		w.Header().Set("Content-Type", "application/xml")
 		w.Write(crossdomainxml)
@@ -223,7 +244,7 @@ func (hls *HSLServer) handle(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (hls *HSLServer) Run(ctx context.Context) {
+func (hls *HLSServer) Run(ctx context.Context) {
 	select {
 	case <-ctx.Done():
 		break
@@ -232,7 +253,7 @@ func (hls *HSLServer) Run(ctx context.Context) {
 	}
 }
 
-func (hls *HSLServer) start() {
+func (hls *HLSServer) start() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		hls.handle(w, r)

@@ -62,7 +62,7 @@ func (c *Consumer) ID() string {
 	return c.conn.id
 }
 
-func (c *Consumer) Play(frame *ds.Frame) {
+func (c *Consumer) Play(name string, frame *ds.Frame) {
 	c.conn.play(frame)
 }
 

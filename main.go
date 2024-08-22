@@ -22,18 +22,18 @@ import (
 
 var VERSION = "master"
 
-func makeHls() *hls.HSLServer {
+func makeHls(mediaCenter *center.MediaCenter) *hls.HLSServer {
 	hlsAddr := configure.Config.GetString("hls_addr")
 	hlsListen, err := net.Listen("tcp", hlsAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	hlsServer := hls.NewHLSServer(hlsListen)
+	hlsServer := hls.NewHLSServer(hlsListen, mediaCenter)
 	return hlsServer
 }
 
-func makeRtmp() *rtmp.Server {
+func makeRtmp(mediaCenter *center.MediaCenter) *rtmp.Server {
 	rtmpAddr := configure.Config.GetString("rtmp_addr")
 	isRtmps := configure.Config.GetBool("enable_rtmps")
 
@@ -64,7 +64,7 @@ func makeRtmp() *rtmp.Server {
 			log.Error("RTMP server panic: ", r)
 		}
 	}()
-	rtmpServer := rtmp.NewServer(rtmpListen, rtmp.MakeMediaCenter(center.MakeMediaCenter()))
+	rtmpServer := rtmp.NewServer(rtmpListen, rtmp.MakeMediaCenter(mediaCenter))
 	return rtmpServer
 }
 
@@ -146,10 +146,11 @@ func main() {
 	r := repo.NewRepo()
 	configure.Config.UnmarshalKey("server", &capps)
 	apps := make([]app, 0)
-	apps = append(apps, makeRtmp())
+	mediaCenter := center.MakeMediaCenter()
+	apps = append(apps, makeRtmp(mediaCenter))
 	for _, app := range capps {
 		if app.Hls {
-			apps = append(apps, makeHls())
+			apps = append(apps, makeHls(mediaCenter))
 		}
 		if app.Flv {
 			startHTTPFlv()

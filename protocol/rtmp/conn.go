@@ -50,7 +50,7 @@ func (producer *MediaProducer) Dispatch(ctx context.Context) {
 			for _, c := range tmp {
 				if c.IsAlive() {
 					tmp := frame.Clone()
-					c.Play(tmp)
+					c.Play(producer.name, tmp)
 				}
 			}
 		case <-ctx.Done():

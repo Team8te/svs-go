@@ -6,15 +6,16 @@ import (
 
 	"github.com/Team8te/svs-go/ds"
 	cent "github.com/Team8te/svs-go/protocol/center"
+	log "github.com/sirupsen/logrus"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-rtmp"
 )
 
 type center interface {
-	Register(name string, p cent.MediaProducer)
+	Register(name string, p cent.MediaProducer) error
 	Find(name string) cent.MediaProducer
 	AddConsumer(ctx context.Context, producerName string, consumer cent.Consumer) error
-	Remove(name string)
+	Remove(name string) error
 }
 
 type MediaCenter struct {
@@ -29,16 +30,36 @@ func MakeMediaCenter(c center) *MediaCenter {
 
 func (c *MediaCenter) Handle(ctx context.Context, conn *MediaSession) error {
 	conn.handle.OnPlay(func(app, streamName string, start, duration float64, reset bool) rtmp.StatusCode {
-		if source := c.center.Find(streamName); source == nil {
+		cons := MakeConsumer(streamName, conn)
+		err := c.center.AddConsumer(ctx, streamName, cons)
+		if err != nil {
+			log.Warnf("Failed to register new consumer: %v", err)
 			return rtmp.NETSTREAM_PLAY_NOTFOUND
 		}
+		log.Debugf("Consumer ready to play: %v", streamName)
+		go c.HandleConsumer(ctx, cons)
 		return rtmp.NETSTREAM_PLAY_START
 	})
 
 	conn.handle.OnPublish(func(app, streamName string) rtmp.StatusCode {
+		conn.handle.OnFrame(func(cid codec.CodecID, pts, dts uint32, frame []byte) {
+			f := &ds.Frame{
+				Codec: cid,
+				Data:  frame,
+				PTS:   pts,
+				DTS:   dts,
+			}
+			conn.C <- f
+		})
+		p := newMediaProducer(streamName, conn)
+		err := c.center.Register(streamName, p)
+		if err != nil {
+			log.Warnf("Failed to register new producer: %v", err)
+			return rtmp.NETSTREAM_CONNECT_REJECTED
+		}
+		go c.HandlerProducer(ctx, p)
+		log.Debugf("Producer ready to publish: %v", streamName)
 		return rtmp.NETSTREAM_PUBLISH_START
-
-		return rtmp.NETSTREAM_CONNECT_REJECTED
 	})
 
 	conn.handle.SetOutput(func(b []byte) error {
@@ -49,28 +70,8 @@ func (c *MediaCenter) Handle(ctx context.Context, conn *MediaSession) error {
 	conn.handle.OnStateChange(func(newState rtmp.RtmpState) {
 		if newState == rtmp.STATE_RTMP_PLAY_START {
 			fmt.Println("play start")
-			name := conn.GetStreamName()
-			cons := MakeConsumer(name, conn)
-			err := c.center.AddConsumer(ctx, name, cons)
-			if err == nil {
-				fmt.Println("ready to play")
-				go c.HandleConsumer(ctx, cons)
-			}
 		} else if newState == rtmp.STATE_RTMP_PUBLISH_START {
 			fmt.Println("publish start")
-			conn.handle.OnFrame(func(cid codec.CodecID, pts, dts uint32, frame []byte) {
-				f := &ds.Frame{
-					Codec: cid,
-					Data:  frame,
-					PTS:   pts,
-					DTS:   dts,
-				}
-				conn.C <- f
-			})
-			name := conn.GetStreamName()
-			p := newMediaProducer(name, conn)
-			go c.HandlerProducer(ctx, p)
-			c.center.Register(name, p)
 		}
 	})
 
