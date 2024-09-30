@@ -12,6 +12,7 @@ import (
 )
 
 type center interface {
+	RemoveConsumer(ctx context.Context, name, id string) error
 	Register(name string, p cent.MediaProducer) error
 	Find(name string) cent.MediaProducer
 	AddConsumer(ctx context.Context, producerName string, consumer cent.Consumer) error
@@ -86,6 +87,7 @@ func (c *MediaCenter) HandlerProducer(ctx context.Context, p *MediaProducer) {
 func (c *MediaCenter) HandleConsumer(ctx context.Context, cons *Consumer) {
 	defer func() {
 		cons.Close()
+		c.center.RemoveConsumer(ctx, cons.Name(), cons.ID())
 		p := c.center.Find(cons.Name())
 		if p != nil {
 			p.RemoveConsumer(cons.ID())

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Team8te/svs-go/configure"
 	"github.com/Team8te/svs-go/ds"
 )
 
@@ -20,18 +21,25 @@ type Consumer interface {
 type MediaProducer interface {
 	Name() string
 	RemoveConsumer(id string)
+	FindConsumer(id string) Consumer
 	AddConsumer(consumer Consumer)
 	Dispatch(ctx context.Context)
 }
 
+type HLSServer interface {
+	CreateConsumer(name string) (Consumer, error)
+}
+
 type MediaCenter struct {
+	hls    HLSServer
 	center map[string]MediaProducer
 	mtx    sync.Mutex
 }
 
-func MakeMediaCenter() *MediaCenter {
+func MakeMediaCenter(hls HLSServer) *MediaCenter {
 	return &MediaCenter{
 		center: make(map[string]MediaProducer),
+		hls:    hls,
 	}
 }
 
@@ -43,6 +51,18 @@ func (c *MediaCenter) Register(name string, p MediaProducer) error {
 		return fmt.Errorf("Already producer exists: %v", name)
 	}
 	c.center[name] = p
+
+	if !configure.NeedHLS() {
+		return nil
+	}
+
+	cons, err := c.hls.CreateConsumer(name)
+	if err != nil {
+		return err
+	}
+
+	p.AddConsumer(cons)
+
 	return nil
 }
 
@@ -65,6 +85,14 @@ func (c *MediaCenter) Find(name string) MediaProducer {
 	} else {
 		return nil
 	}
+}
+
+func (c *MediaCenter) ConsumerExists(_ context.Context, stream, id string) bool {
+	p := c.Find(stream)
+	if p == nil {
+		return false
+	}
+	return p.FindConsumer(id) != nil
 }
 
 func (c *MediaCenter) AddConsumer(_ context.Context, producerName string, consumer Consumer) error {

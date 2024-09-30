@@ -81,3 +81,13 @@ func (producer *MediaProducer) RemoveConsumer(id string) {
 func (producer *MediaProducer) Name() string {
 	return producer.name
 }
+
+func (producer *MediaProducer) FindConsumer(id string) cent.Consumer {
+	for _, consumer := range producer.consumers {
+		if consumer.ID() == id {
+			return consumer
+		}
+	}
+
+	return nil
+}

@@ -22,14 +22,14 @@ import (
 
 var VERSION = "master"
 
-func makeHls(mediaCenter *center.MediaCenter) *hls.HLSServer {
+func makeHls() *hls.HLSServer {
 	hlsAddr := configure.Config.GetString("hls_addr")
 	hlsListen, err := net.Listen("tcp", hlsAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	hlsServer := hls.NewHLSServer(hlsListen, mediaCenter)
+	hlsServer := hls.NewHLSServer(hlsListen)
 	return hlsServer
 }
 
@@ -134,11 +134,11 @@ func main() {
 	}()
 
 	log.Infof(`
-     _     _            ____       
-    | |   (_)_   _____ / ___| ___  
-    | |   | \ \ / / _ \ |  _ / _ \ 
+     _     _            ____
+    | |   (_)_   _____ / ___| ___
+    | |   | \ \ / / _ \ |  _ / _ \
     | |___| |\ V /  __/ |_| | (_) |
-    |_____|_| \_/ \___|\____|\___/ 
+    |_____|_| \_/ \___|\____|\___/
         version: %s
 	`, VERSION)
 
@@ -146,11 +146,12 @@ func main() {
 	r := repo.NewRepo()
 	configure.Config.UnmarshalKey("server", &capps)
 	apps := make([]app, 0)
-	mediaCenter := center.MakeMediaCenter()
+	hls := makeHls()
+	mediaCenter := center.MakeMediaCenter(hls)
 	apps = append(apps, makeRtmp(mediaCenter))
 	for _, app := range capps {
 		if app.Hls {
-			apps = append(apps, makeHls(mediaCenter))
+			apps = append(apps, hls)
 		}
 		if app.Flv {
 			startHTTPFlv()
